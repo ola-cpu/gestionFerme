@@ -1,15 +1,25 @@
 const express = require('express');
 const app = express();
-const port = 3000;
+const port = 3001; // Changed to 3001 to avoid conflict with React (3000)
 
 app.use(express.json());
 
 // Routes
 const livestockRoutes = require('./src/routes/livestock');
 const stockRoutes = require('./src/routes/stocks');
+const cropRoutes = require('./src/routes/crops');
+const purchaseRoutes = require('./src/routes/purchases');
+const saleRoutes = require('./src/routes/sales');
+const personnelRoutes = require('./src/routes/personnel');
+const financeRoutes = require('./src/routes/finance');
 
 app.use('/api/livestock', livestockRoutes);
 app.use('/api/stocks', stockRoutes);
+app.use('/api/crops', cropRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/sales', saleRoutes);
+app.use('/api/personnel', personnelRoutes);
+app.use('/api/finance', financeRoutes);
 
 app.get('/', (req, res) => {
   res.send('Gestock-Ferme API is running');

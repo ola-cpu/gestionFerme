@@ -165,3 +165,12 @@ CREATE TABLE transactions (
     amount DECIMAL(15,2),
     description TEXT
 );
+-- Maintenance Table
+CREATE TABLE maintenance_records (
+    id SERIAL PRIMARY KEY,
+    asset_name VARCHAR(100) NOT NULL, -- Equipment, Vehicle, Building
+    maintenance_date DATE NOT NULL,
+    description TEXT,
+    cost DECIMAL(12,2),
+    next_due_date DATE
+);

@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import './App.css';
 import StockList from './components/StockList';
+import CropsList from './components/CropsList';
+import PurchaseList from './components/PurchaseList';
+import SaleList from './components/SaleList';
+import EmployeeList from './components/EmployeeList';
+import TransactionList from './components/TransactionList';
 
 function App() {
   const [activeModule, setActiveModule] = useState(null);
@@ -19,6 +24,16 @@ function App() {
     switch (activeModule) {
       case 'stocks':
         return <StockList />;
+      case 'cultures':
+        return <CropsList />;
+      case 'achats':
+        return <PurchaseList />;
+      case 'ventes':
+        return <SaleList />;
+      case 'personnel':
+        return <EmployeeList />;
+      case 'tresorerie':
+        return <TransactionList />;
       case 'elevage':
         return <p>Interface Élevage en cours de développement...</p>;
       default:
