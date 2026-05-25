@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './App.css';
 import StockList from './components/StockList';
 import CropsList from './components/CropsList';
+import CropDetail from './components/CropDetail';
 import PurchaseList from './components/PurchaseList';
 import SaleList from './components/SaleList';
 import EmployeeList from './components/EmployeeList';
@@ -12,6 +13,7 @@ import LivestockDetail from './components/LivestockDetail';
 function App() {
   const [activeModule, setActiveModule] = useState(null);
   const [selectedBatch, setSelectedBatch] = useState(null);
+  const [selectedCycle, setSelectedCycle] = useState(null);
 
   const modules = [
     { id: 'elevage', name: 'Élevage', icon: '🐄' },
@@ -35,11 +37,16 @@ function App() {
       return <LivestockList onSelectBatch={handleSelectBatch} />;
     }
 
+    if (activeModule === 'cultures') {
+      if (selectedCycle) {
+        return <CropDetail cycleId={selectedCycle} onBack={() => setSelectedCycle(null)} />;
+      }
+      return <CropsList onSelectCycle={(id) => setSelectedCycle(id)} />;
+    }
+
     switch (activeModule) {
       case 'stocks':
         return <StockList />;
-      case 'cultures':
-        return <CropsList />;
       case 'achats':
         return <PurchaseList />;
       case 'ventes':
@@ -62,13 +69,19 @@ function App() {
     }
   };
 
+  const resetNav = () => {
+    setActiveModule(null);
+    setSelectedBatch(null);
+    setSelectedCycle(null);
+  };
+
   return (
     <div className="App">
       <header className="App-header">
-        <h1 onClick={() => { setActiveModule(null); setSelectedBatch(null); }} style={{cursor: 'pointer'}}>Gestock-Ferme</h1>
+        <h1 onClick={resetNav} style={{cursor: 'pointer'}}>Gestock-Ferme</h1>
         <p>Gestion Intégrée de Ferme</p>
         {activeModule && (
-          <button onClick={() => { setActiveModule(null); setSelectedBatch(null); }}>
+          <button onClick={resetNav}>
             Retour au tableau de bord
           </button>
         )}

@@ -112,7 +112,28 @@ CREATE TABLE mortality_records (
 );
 
 -- ==========================================
--- 2. CULTURES (Crops)
+-- 2. STOCKS & MAGASIN
+-- ==========================================
+
+CREATE TABLE stock_categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL
+);
+
+INSERT INTO stock_categories (name) VALUES
+('Aliments'), ('Médicaments'), ('Semences'), ('Engrais'), ('Produits Phytosanitaires');
+
+CREATE TABLE stock_items (
+    id SERIAL PRIMARY KEY,
+    category_id INTEGER REFERENCES stock_categories(id),
+    name VARCHAR(100) NOT NULL,
+    unit VARCHAR(20), -- kg, L, unit
+    minimum_threshold DECIMAL(10,2),
+    current_stock DECIMAL(10,2) DEFAULT 0
+);
+
+-- ==========================================
+-- 3. CULTURES (Crops)
 -- ==========================================
 
 CREATE TABLE plots (
@@ -126,28 +147,29 @@ CREATE TABLE crop_cycles (
     id SERIAL PRIMARY KEY,
     plot_id INTEGER REFERENCES plots(id),
     crop_name VARCHAR(100) NOT NULL,
+    season VARCHAR(50),
     planting_date DATE,
     harvest_date DATE,
     expected_yield DECIMAL(10,2),
     actual_yield DECIMAL(10,2)
 );
 
--- ==========================================
--- 3. STOCKS & MAGASIN
--- ==========================================
-
-CREATE TABLE stock_categories (
+CREATE TABLE crop_tasks (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL -- Aliments, Médicaments, Intrants, etc.
+    crop_cycle_id INTEGER REFERENCES crop_cycles(id) ON DELETE CASCADE,
+    task_type VARCHAR(100) NOT NULL, -- labour, semis, désherbage, irrigation, récolte, etc.
+    task_date DATE NOT NULL,
+    description TEXT,
+    cost DECIMAL(12,2) DEFAULT 0
 );
 
-CREATE TABLE stock_items (
+CREATE TABLE crop_inputs (
     id SERIAL PRIMARY KEY,
-    category_id INTEGER REFERENCES stock_categories(id),
-    name VARCHAR(100) NOT NULL,
-    unit VARCHAR(20), -- kg, L, unit
-    minimum_threshold DECIMAL(10,2),
-    current_stock DECIMAL(10,2) DEFAULT 0
+    crop_task_id INTEGER REFERENCES crop_tasks(id) ON DELETE CASCADE,
+    stock_item_id INTEGER REFERENCES stock_items(id),
+    quantity DECIMAL(10,2) NOT NULL,
+    unit VARCHAR(20),
+    cost DECIMAL(12,2) DEFAULT 0
 );
 
 -- ==========================================

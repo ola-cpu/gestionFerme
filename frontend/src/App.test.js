@@ -12,3 +12,9 @@ test('renders Élevage module', () => {
   const moduleElement = screen.getByText(/Élevage/i);
   expect(moduleElement).toBeInTheDocument();
 });
+
+test('renders Cultures module', () => {
+  render(<App />);
+  const moduleElement = screen.getByText(/Cultures/i);
+  expect(moduleElement).toBeInTheDocument();
+});
