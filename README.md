@@ -16,6 +16,16 @@ Centraliser toutes les données de la ferme pour améliorer la traçabilité, r�
 - **Maintenance**: Équipements, véhicules, bâtiments.
 - **Tableaux de bord**: Indicateurs de performance (mortalité, GMQ, marge, etc.).
 
+## Dépannage (Troubleshooting)
+
+Si vous rencontrez l'erreur suivante lors du lancement du frontend :
+`'react-scripts' n’est pas reconnu en tant que commande interne ou externe, un programme exécutable ou un fichier de commandes.`
+
+Cela signifie que les dépendances n'ont pas été installées correctement. Pour résoudre ce problème :
+1. Assurez-vous d'être dans le dossier `frontend`.
+2. Supprimez le dossier `node_modules` s'il existe.
+3. Exécutez `npm install`.
+
 ## Installation
 
 Suivez ces étapes pour installer et lancer le projet localement.
