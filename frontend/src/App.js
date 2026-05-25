@@ -6,9 +6,12 @@ import PurchaseList from './components/PurchaseList';
 import SaleList from './components/SaleList';
 import EmployeeList from './components/EmployeeList';
 import TransactionList from './components/TransactionList';
+import LivestockList from './components/LivestockList';
+import LivestockDetail from './components/LivestockDetail';
 
 function App() {
   const [activeModule, setActiveModule] = useState(null);
+  const [selectedBatch, setSelectedBatch] = useState(null);
 
   const modules = [
     { id: 'elevage', name: 'Élevage', icon: '🐄' },
@@ -20,7 +23,18 @@ function App() {
     { id: 'tresorerie', name: 'Trésorerie', icon: '🏦' }
   ];
 
+  const handleSelectBatch = (batch) => {
+    setSelectedBatch(batch);
+  };
+
   const renderContent = () => {
+    if (activeModule === 'elevage') {
+      if (selectedBatch) {
+        return <LivestockDetail batch={selectedBatch} onBack={() => setSelectedBatch(null)} />;
+      }
+      return <LivestockList onSelectBatch={handleSelectBatch} />;
+    }
+
     switch (activeModule) {
       case 'stocks':
         return <StockList />;
@@ -34,8 +48,6 @@ function App() {
         return <EmployeeList />;
       case 'tresorerie':
         return <TransactionList />;
-      case 'elevage':
-        return <p>Interface Élevage en cours de développement...</p>;
       default:
         return (
           <div className="module-grid">
@@ -53,9 +65,13 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1 onClick={() => setActiveModule(null)} style={{cursor: 'pointer'}}>Gestock-Ferme</h1>
+        <h1 onClick={() => { setActiveModule(null); setSelectedBatch(null); }} style={{cursor: 'pointer'}}>Gestock-Ferme</h1>
         <p>Gestion Intégrée de Ferme</p>
-        {activeModule && <button onClick={() => setActiveModule(null)}>Retour au tableau de bord</button>}
+        {activeModule && (
+          <button onClick={() => { setActiveModule(null); setSelectedBatch(null); }}>
+            Retour au tableau de bord
+          </button>
+        )}
       </header>
       <main className="App-main">
         {renderContent()}

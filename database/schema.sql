@@ -43,6 +43,10 @@ CREATE TABLE species (
     name VARCHAR(50) NOT NULL -- Bovins, Ovins, Volailles, etc.
 );
 
+-- Initial species
+INSERT INTO species (name) VALUES
+('Bovins'), ('Ovins'), ('Caprins'), ('Volailles'), ('Porcins'), ('Poissons');
+
 CREATE TABLE livestock_batches (
     id SERIAL PRIMARY KEY,
     species_id INTEGER REFERENCES species(id),
@@ -54,13 +58,57 @@ CREATE TABLE livestock_batches (
     status VARCHAR(50) DEFAULT 'Active' -- Active, Sold, Finished
 );
 
+CREATE TABLE livestock_individuals (
+    id SERIAL PRIMARY KEY,
+    batch_id INTEGER REFERENCES livestock_batches(id) ON DELETE CASCADE,
+    identification_code VARCHAR(50) UNIQUE,
+    birth_date DATE,
+    gender VARCHAR(10), -- Male, Female
+    status VARCHAR(50) DEFAULT 'Active' -- Active, Sold, Deceased
+);
+
+CREATE TABLE weight_records (
+    id SERIAL PRIMARY KEY,
+    batch_id INTEGER REFERENCES livestock_batches(id) ON DELETE CASCADE,
+    individual_id INTEGER REFERENCES livestock_individuals(id) ON DELETE CASCADE,
+    record_date DATE NOT NULL,
+    weight DECIMAL(10,2) NOT NULL
+);
+
 CREATE TABLE health_records (
     id SERIAL PRIMARY KEY,
-    batch_id INTEGER REFERENCES livestock_batches(id),
+    batch_id INTEGER REFERENCES livestock_batches(id) ON DELETE CASCADE,
+    individual_id INTEGER REFERENCES livestock_individuals(id) ON DELETE CASCADE,
     record_date DATE NOT NULL,
     type VARCHAR(100), -- Vaccination, Treatment, Deworming
     description TEXT,
     cost DECIMAL(12,2)
+);
+
+CREATE TABLE feeding_records (
+    id SERIAL PRIMARY KEY,
+    batch_id INTEGER REFERENCES livestock_batches(id) ON DELETE CASCADE,
+    record_date DATE NOT NULL,
+    feed_type VARCHAR(100),
+    quantity DECIMAL(10,2),
+    unit VARCHAR(20),
+    cost DECIMAL(12,2)
+);
+
+CREATE TABLE reproduction_records (
+    id SERIAL PRIMARY KEY,
+    individual_id INTEGER REFERENCES livestock_individuals(id) ON DELETE CASCADE,
+    event_date DATE NOT NULL,
+    event_type VARCHAR(50), -- Heat, Insemination, Birth
+    result TEXT
+);
+
+CREATE TABLE mortality_records (
+    id SERIAL PRIMARY KEY,
+    batch_id INTEGER REFERENCES livestock_batches(id) ON DELETE CASCADE,
+    individual_id INTEGER REFERENCES livestock_individuals(id) ON DELETE CASCADE,
+    mortality_date DATE NOT NULL,
+    cause TEXT
 );
 
 -- ==========================================
@@ -138,6 +186,17 @@ CREATE TABLE sales (
     sale_date DATE NOT NULL,
     total_amount DECIMAL(15,2),
     payment_status VARCHAR(50) -- Pending, Paid, Partial
+);
+
+CREATE TABLE sale_items (
+    id SERIAL PRIMARY KEY,
+    sale_id INTEGER REFERENCES sales(id) ON DELETE CASCADE,
+    batch_id INTEGER REFERENCES livestock_batches(id),
+    individual_id INTEGER REFERENCES livestock_individuals(id),
+    product_description TEXT,
+    quantity DECIMAL(10,2),
+    unit_price DECIMAL(12,2),
+    total_price DECIMAL(15,2)
 );
 
 -- ==========================================
