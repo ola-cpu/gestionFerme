@@ -46,4 +46,20 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// GET sale items (for traceability)
+router.get('/items', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT si.*, s.sale_date, b.batch_name
+      FROM sale_items si
+      JOIN sales s ON si.sale_id = s.id
+      LEFT JOIN livestock_batches b ON si.batch_id = b.id
+      ORDER BY s.sale_date DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
