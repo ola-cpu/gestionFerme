@@ -10,8 +10,18 @@ app.use(express.json());
 // Auth Routes
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
+
+  const roleMap = {
+    'admin': 'Admin',
+    'elevage': 'Chef d’élevage',
+    'magasin': 'Magasinier',
+    'veto': 'Vétérinaire/technicien',
+    'vente': 'Commercial',
+    'compta': 'RH/Comptable'
+  };
+
   try {
-    // Simple mock authentication (password check would go here in a real app)
+    // Attempt database authentication
     const result = await db.query(
       'SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = $1 AND u.is_active = TRUE',
       [username]
@@ -19,36 +29,28 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
-      res.json({
+      return res.json({
         id: user.id,
         username: user.username,
         role: user.role_name,
         token: `mock-token-${user.id}`
       });
-    } else {
-      // Demo fallback if DB is empty/missing
-      const roleMap = {
-          'admin': 'Admin',
-          'elevage': 'Chef d’élevage',
-          'magasin': 'Magasinier',
-          'veto': 'Vétérinaire/technicien',
-          'vente': 'Commercial',
-          'compta': 'RH/Comptable'
-      };
-      if (roleMap[username] && password === 'password') {
-          return res.json({
-              id: 999,
-              username: username,
-              role: roleMap[username],
-              token: `mock-token-999`
-          });
-      }
-      res.status(401).json({ error: 'Identifiants invalides' });
     }
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Login database error, attempting fallback:', err.message);
   }
+
+  // Demo fallback if DB is empty/missing OR if DB connection fails
+  if (roleMap[username] && password === 'password') {
+    return res.json({
+      id: 999,
+      username: username,
+      role: roleMap[username],
+      token: `mock-token-999`
+    });
+  }
+
+  res.status(401).json({ error: 'Identifiants invalides' });
 });
 
 // Apply authentication middleware to all subsequent routes

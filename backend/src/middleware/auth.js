@@ -16,26 +16,21 @@ async function authenticate(req, res, next) {
       [userId]
     );
 
-    if (result.rows.length === 0) {
-        // Mock fallback for demo purposes
-        if (userId === '999') {
-            req.user = { id: 999, username: 'demo', role_name: 'Admin' };
-            return next();
-        }
-        return res.status(401).json({ error: 'Invalid or inactive user' });
+    if (result.rows.length > 0) {
+      req.user = result.rows[0];
+      return next();
     }
-
-    req.user = result.rows[0];
-    next();
   } catch (err) {
-    // If DB fails but we have the demo ID
-    if (userId === '999') {
-        req.user = { id: 999, username: 'demo', role_name: 'Admin' };
-        return next();
-    }
-    console.error('Auth error:', err);
-    res.status(500).json({ error: 'Authentication error' });
+    console.error('Auth database error, attempting fallback:', err.message);
   }
+
+  // Mock fallback for demo purposes (e.g., if DB is down or user not in DB)
+  if (userId === '999') {
+    req.user = { id: 999, username: 'demo', role_name: 'Admin' };
+    return next();
+  }
+
+  res.status(401).json({ error: 'Invalid or inactive user' });
 }
 
 /**
