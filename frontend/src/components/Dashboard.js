@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 
-function Dashboard() {
+function Dashboard({ user, ...props }) {
   const [kpis, setKpis] = useState({});
   const [alerts, setAlerts] = useState({ stock: [], expiry: [] });
 
   useEffect(() => {
-    fetch('/api/reports/kpis')
+    const headers = { 'X-User-ID': user?.id };
+    fetch('/api/reports/kpis', { headers })
       .then(res => res.json())
       .then(data => setKpis(data));
 
-    fetch('/api/reports/alerts')
+    fetch('/api/reports/alerts', { headers })
       .then(res => res.json())
       .then(data => setAlerts(data));
-  }, []);
+  }, [user]);
 
   return (
     <div className="dashboard">

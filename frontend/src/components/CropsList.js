@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function CropsList({ onSelectCycle }) {
+function CropsList({ user, onSelectCycle }) {
   const [cycles, setCycles] = useState([]);
   const [plots, setPlots] = useState([]);
   const [showCycleForm, setShowCycleForm] = useState(false);
@@ -16,7 +16,7 @@ function CropsList({ onSelectCycle }) {
 
   const fetchCycles = async () => {
     try {
-      const res = await fetch('/api/crops');
+      const res = await fetch('/api/crops', { headers: { 'X-User-ID': user?.id } });
       const data = await res.json();
       setCycles(data);
     } catch (err) {
@@ -26,7 +26,7 @@ function CropsList({ onSelectCycle }) {
 
   const fetchPlots = async () => {
     try {
-      const res = await fetch('/api/crops/plots');
+      const res = await fetch('/api/crops/plots', { headers: { 'X-User-ID': user?.id } });
       const data = await res.json();
       setPlots(data);
     } catch (err) {
@@ -39,7 +39,7 @@ function CropsList({ onSelectCycle }) {
     try {
       await fetch('/api/crops', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'X-User-ID': user?.id,  'Content-Type': 'application/json' },
         body: JSON.stringify(newCycle)
       });
       setShowCycleForm(false);
@@ -54,7 +54,7 @@ function CropsList({ onSelectCycle }) {
     try {
       await fetch('/api/crops/plots', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'X-User-ID': user?.id,  'Content-Type': 'application/json' },
         body: JSON.stringify(newPlot)
       });
       setShowPlotForm(false);

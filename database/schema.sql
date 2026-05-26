@@ -15,11 +15,11 @@ CREATE TABLE roles (
 -- Initial roles
 INSERT INTO roles (name, description) VALUES
 ('Admin', 'Administrateur avec tous les accès'),
-('Gestionnaire', 'Gestionnaire de la ferme'),
-('Magasinier', 'Gestionnaire des stocks'),
-('Vétérinaire', 'Suivi sanitaire de l''élevage'),
-('RH', 'Gestion du personnel et de la paie'),
-('Ventes', 'Gestion des ventes et des clients');
+('Chef d’élevage', 'Responsable de la production animale'),
+('Magasinier', 'Gestionnaire des stocks et du magasin'),
+('Vétérinaire/technicien', 'Suivi sanitaire et mortalité'),
+('Commercial', 'Gestion des ventes et des clients'),
+('RH/Comptable', 'Gestion du personnel, paie et comptabilité');
 
 -- Users table
 CREATE TABLE users (

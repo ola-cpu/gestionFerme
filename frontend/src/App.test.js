@@ -1,20 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders Gestock-Ferme title', () => {
+test('renders Gestock-Ferme title in header', () => {
   render(<App />);
-  const titleElement = screen.getByText(/Gestock-Ferme/i);
-  expect(titleElement).toBeInTheDocument();
+  const titleElements = screen.getAllByText(/Gestock-Ferme/i);
+  expect(titleElements.length).toBeGreaterThan(0);
 });
 
-test('renders Élevage module', () => {
+test('renders Login form when not authenticated', () => {
   render(<App />);
-  const moduleElement = screen.getByText(/Élevage/i);
-  expect(moduleElement).toBeInTheDocument();
-});
-
-test('renders Cultures module', () => {
-  render(<App />);
-  const moduleElement = screen.getByText(/Cultures/i);
-  expect(moduleElement).toBeInTheDocument();
+  const loginTitle = screen.getByText(/Connexion Gestock-Ferme/i);
+  expect(loginTitle).toBeInTheDocument();
 });

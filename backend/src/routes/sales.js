@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { logAction } = require('../utils/auditLogger');
+const { authorize } = require('../middleware/auth');
+
+// Apply authorization to all sales routes
+router.use(authorize(['Commercial']));
 
 // --- SALES ---
 router.get('/', async (req, res) => {

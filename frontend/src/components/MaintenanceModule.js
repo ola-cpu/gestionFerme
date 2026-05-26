@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 
-function MaintenanceModule() {
+function MaintenanceModule({ user }) {
   const [assets, setAssets] = useState([]);
   const [maintenance, setMaintenance] = useState([]);
   const [view, setView] = useState('assets'); // assets or records
 
   useEffect(() => {
-    fetch('/api/assets')
+    fetch('/api/assets', { headers: { 'X-User-ID': user?.id } })
       .then(res => res.json())
       .then(data => setAssets(data));
 
-    fetch('/api/maintenance')
+    fetch('/api/maintenance', { headers: { 'X-User-ID': user?.id } })
       .then(res => res.json())
       .then(data => setMaintenance(data));
   }, []);

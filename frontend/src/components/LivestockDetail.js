@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-function LivestockDetail({ batch, onBack }) {
+function LivestockDetail({ user, batch, onBack }) {
   const [individuals, setIndividuals] = useState([]);
   const [healthRecords, setHealthRecords] = useState([]);
   const [feedingRecords, setFeedingRecords] = useState([]);
@@ -11,11 +11,11 @@ function LivestockDetail({ batch, onBack }) {
   const fetchBatchData = useCallback(async () => {
     try {
       const [indRes, healthRes, feedingRes, slaughterRes, perfRes] = await Promise.all([
-        fetch(`/api/livestock/${batch.id}/individuals`),
-        fetch(`/api/livestock/${batch.id}/health`),
-        fetch(`/api/livestock/${batch.id}/feeding`),
-        fetch(`/api/livestock/${batch.id}/slaughter`),
-        fetch(`/api/livestock/${batch.id}/performance`)
+        fetch(`/api/livestock/${batch.id}/individuals`, { headers: { 'X-User-ID': user?.id } }),
+        fetch(`/api/livestock/${batch.id}/health`, { headers: { 'X-User-ID': user?.id } }),
+        fetch(`/api/livestock/${batch.id}/feeding`, { headers: { 'X-User-ID': user?.id } }),
+        fetch(`/api/livestock/${batch.id}/slaughter`, { headers: { 'X-User-ID': user?.id } }),
+        fetch(`/api/livestock/${batch.id}/performance`, { headers: { 'X-User-ID': user?.id } })
       ]);
 
       const indData = await indRes.json();

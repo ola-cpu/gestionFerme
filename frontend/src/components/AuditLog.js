@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
-function AuditLog() {
+function AuditLog({ user }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/audit')
+    fetch('/api/audit', { headers: { 'X-User-ID': user?.id } })
       .then(res => res.json())
       .then(data => {
         setLogs(Array.isArray(data) ? data : []);
