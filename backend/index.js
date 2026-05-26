@@ -15,6 +15,7 @@ const financeRoutes = require('./src/routes/finance');
 const assetRoutes = require('./src/routes/assets');
 const maintenanceRoutes = require('./src/routes/maintenance');
 const reportRoutes = require('./src/routes/reports');
+const auditRoutes = require('./src/routes/audit');
 
 app.use('/api/livestock', livestockRoutes);
 app.use('/api/stocks', stockRoutes);
@@ -26,6 +27,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/audit', auditRoutes);
 
 app.get('/', (req, res) => {
   res.send('Gestock-Ferme API is running');

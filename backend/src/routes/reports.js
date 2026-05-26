@@ -83,4 +83,28 @@ router.get('/export/transactions', async (req, res) => {
     }
 });
 
+// GET Traceability report for a batch
+router.get('/traceability/batch/:id', async (req, res) => {
+    const batchId = req.params.id;
+    try {
+        const batch = await db.query('SELECT b.*, s.name as species_name FROM livestock_batches b JOIN species s ON b.species_id = s.id WHERE b.id = $1', [batchId]);
+        const health = await db.query('SELECT * FROM health_records WHERE batch_id = $1 ORDER BY record_date ASC', [batchId]);
+        const feeding = await db.query('SELECT * FROM feeding_records WHERE batch_id = $1 ORDER BY record_date ASC', [batchId]);
+        const slaughter = await db.query('SELECT * FROM slaughter_records WHERE batch_id = $1 ORDER BY slaughter_date ASC', [batchId]);
+        const sales = await db.query('SELECT s.*, si.quantity, si.unit_price FROM sales s JOIN sale_items si ON s.id = si.sale_id WHERE si.batch_id = $1', [batchId]);
+
+        res.json({
+            batch: batch.rows[0],
+            history: {
+                health: health.rows,
+                feeding: feeding.rows,
+                slaughter: slaughter.rows,
+                sales: sales.rows
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

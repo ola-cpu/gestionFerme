@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { logAction } = require('../utils/auditLogger');
 
 // --- SALES ---
 router.get('/', async (req, res) => {
@@ -22,12 +23,15 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { client_id, sale_date, total_amount, payment_status, document_type, reference_number, delivery_status } = req.body;
+  const { client_id, sale_date, total_amount, payment_status, document_type, reference_number, delivery_status, user_id } = req.body;
   try {
     const result = await db.query(
       'INSERT INTO sales (client_id, sale_date, total_amount, payment_status, document_type, reference_number, delivery_status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [client_id, sale_date, total_amount, payment_status, document_type, reference_number, delivery_status]
     );
+
+    await logAction(user_id, 'CREATE_SALE', 'sales', result.rows[0].id, { reference_number, total_amount });
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') { // Unique constraint violation
@@ -96,12 +100,15 @@ router.get('/payments', async (req, res) => {
 });
 
 router.post('/payments', async (req, res) => {
-  const { sale_id, amount, payment_method } = req.body;
+  const { sale_id, amount, payment_method, user_id } = req.body;
   try {
     const result = await db.query(
       'INSERT INTO sale_payments (sale_id, amount, payment_method) VALUES ($1, $2, $3) RETURNING *',
       [sale_id, amount, payment_method]
     );
+
+    await logAction(user_id, 'RECORD_PAYMENT', 'sale_payments', result.rows[0].id, { sale_id, amount });
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
