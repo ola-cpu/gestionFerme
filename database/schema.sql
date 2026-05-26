@@ -130,7 +130,9 @@ CREATE TABLE stock_items (
     unit VARCHAR(20), -- kg, L, unit
     minimum_threshold DECIMAL(10,2),
     current_stock DECIMAL(10,2) DEFAULT 0,
-    valuation_method VARCHAR(10) DEFAULT 'CMUP' -- FIFO, CMUP
+    valuation_method VARCHAR(10) DEFAULT 'CMUP', -- FIFO, CMUP
+    is_product BOOLEAN DEFAULT FALSE,
+    sale_price DECIMAL(12,2) DEFAULT 0
 );
 
 CREATE TABLE stock_batches (
@@ -275,8 +277,10 @@ CREATE TABLE supplier_price_history (
 CREATE TABLE clients (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    type VARCHAR(50), -- Wholesaler, Retailer, Individual
-    phone VARCHAR(20)
+    type VARCHAR(50), -- Wholesaler, Retailer, Restaurateur, Market
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    address TEXT
 );
 
 CREATE TABLE sales (
@@ -284,7 +288,10 @@ CREATE TABLE sales (
     client_id INTEGER REFERENCES clients(id),
     sale_date DATE NOT NULL,
     total_amount DECIMAL(15,2),
-    payment_status VARCHAR(50) -- Pending, Paid, Partial
+    payment_status VARCHAR(50), -- Pending, Paid, Partial
+    document_type VARCHAR(50), -- Devis, Bon de commande, Facture
+    reference_number VARCHAR(50) UNIQUE,
+    delivery_status VARCHAR(50) -- Pending, Shipped, Delivered
 );
 
 CREATE TABLE sale_items (
@@ -292,10 +299,29 @@ CREATE TABLE sale_items (
     sale_id INTEGER REFERENCES sales(id) ON DELETE CASCADE,
     batch_id INTEGER REFERENCES livestock_batches(id),
     individual_id INTEGER REFERENCES livestock_individuals(id),
+    stock_item_id INTEGER REFERENCES stock_items(id), -- For crops, eggs, etc.
     product_description TEXT,
     quantity DECIMAL(10,2),
     unit_price DECIMAL(12,2),
     total_price DECIMAL(15,2)
+);
+
+CREATE TABLE sale_payments (
+    id SERIAL PRIMARY KEY,
+    sale_id INTEGER REFERENCES sales(id) ON DELETE CASCADE,
+    payment_date DATE DEFAULT CURRENT_DATE,
+    amount DECIMAL(15,2) NOT NULL,
+    payment_method VARCHAR(50) -- Cash, Mobile Money, Bank Transfer
+);
+
+CREATE TABLE promotions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    discount_percent DECIMAL(5,2),
+    start_date DATE,
+    end_date DATE,
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 -- ==========================================
@@ -308,7 +334,39 @@ CREATE TABLE employees (
     last_name VARCHAR(100),
     position VARCHAR(100),
     hire_date DATE,
-    base_salary DECIMAL(12,2)
+    base_salary DECIMAL(12,2),
+    contract_type VARCHAR(50), -- Permanent, CDD, Seasonal
+    status VARCHAR(50) DEFAULT 'Active'
+);
+
+CREATE TABLE attendance (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    check_in TIME,
+    check_out TIME,
+    overtime_hours DECIMAL(4,2) DEFAULT 0,
+    status VARCHAR(50) -- Present, Absent, Leave
+);
+
+CREATE TABLE payrolls (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    month INTEGER,
+    year INTEGER,
+    payment_date DATE DEFAULT CURRENT_DATE,
+    base_salary_paid DECIMAL(12,2),
+    bonuses DECIMAL(12,2) DEFAULT 0,
+    deductions DECIMAL(12,2) DEFAULT 0, -- Advances, taxes, etc.
+    net_salary DECIMAL(12,2)
+);
+
+CREATE TABLE work_schedules (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    shift VARCHAR(50), -- Morning, Afternoon, Night
+    tasks TEXT
 );
 
 -- ==========================================
