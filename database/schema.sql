@@ -121,7 +121,7 @@ CREATE TABLE stock_categories (
 );
 
 INSERT INTO stock_categories (name) VALUES
-('Aliments'), ('Médicaments'), ('Semences'), ('Engrais'), ('Produits Phytosanitaires');
+('Aliments'), ('Médicaments/Véto'), ('Intrants agricoles'), ('Emballages'), ('Carburant'), ('Pièces'), ('Produits finis');
 
 CREATE TABLE stock_items (
     id SERIAL PRIMARY KEY,
@@ -129,7 +129,46 @@ CREATE TABLE stock_items (
     name VARCHAR(100) NOT NULL,
     unit VARCHAR(20), -- kg, L, unit
     minimum_threshold DECIMAL(10,2),
-    current_stock DECIMAL(10,2) DEFAULT 0
+    current_stock DECIMAL(10,2) DEFAULT 0,
+    valuation_method VARCHAR(10) DEFAULT 'CMUP' -- FIFO, CMUP
+);
+
+CREATE TABLE stock_batches (
+    id SERIAL PRIMARY KEY,
+    stock_item_id INTEGER REFERENCES stock_items(id) ON DELETE CASCADE,
+    batch_number VARCHAR(50) NOT NULL,
+    expiry_date DATE,
+    initial_quantity DECIMAL(10,2) NOT NULL,
+    current_quantity DECIMAL(10,2) NOT NULL,
+    unit_price DECIMAL(12,2), -- purchase price for valuation
+    received_date DATE DEFAULT CURRENT_DATE
+);
+
+CREATE TABLE stock_movements (
+    id SERIAL PRIMARY KEY,
+    stock_item_id INTEGER REFERENCES stock_items(id) ON DELETE CASCADE,
+    batch_id INTEGER REFERENCES stock_batches(id) ON DELETE SET NULL,
+    movement_type VARCHAR(10) NOT NULL, -- IN, OUT, ADJUST
+    quantity DECIMAL(10,2) NOT NULL,
+    movement_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    reason TEXT, -- e.g., 'Purchase', 'Use in Crops', 'Inventory Discrepancy'
+    user_id INTEGER REFERENCES users(id)
+);
+
+CREATE TABLE inventory_takes (
+    id SERIAL PRIMARY KEY,
+    take_date DATE DEFAULT CURRENT_DATE,
+    performed_by INTEGER REFERENCES users(id),
+    status VARCHAR(50) DEFAULT 'Completed'
+);
+
+CREATE TABLE inventory_take_items (
+    id SERIAL PRIMARY KEY,
+    inventory_take_id INTEGER REFERENCES inventory_takes(id) ON DELETE CASCADE,
+    stock_item_id INTEGER REFERENCES stock_items(id),
+    theoretical_quantity DECIMAL(10,2),
+    actual_quantity DECIMAL(10,2),
+    discrepancy DECIMAL(10,2)
 );
 
 -- ==========================================
@@ -183,12 +222,50 @@ CREATE TABLE suppliers (
     phone VARCHAR(20)
 );
 
+CREATE TABLE purchase_requests (
+    id SERIAL PRIMARY KEY,
+    requester_id INTEGER REFERENCES users(id),
+    request_date DATE DEFAULT CURRENT_DATE,
+    description TEXT,
+    status VARCHAR(50) DEFAULT 'Pending', -- Pending, Approved, Rejected, Ordered
+    validation_date DATE,
+    validator_id INTEGER REFERENCES users(id)
+);
+
 CREATE TABLE purchases (
     id SERIAL PRIMARY KEY,
     supplier_id INTEGER REFERENCES suppliers(id),
+    purchase_request_id INTEGER REFERENCES purchase_requests(id) ON DELETE SET NULL,
     purchase_date DATE NOT NULL,
     total_amount DECIMAL(15,2),
-    status VARCHAR(50) -- Ordered, Received, Paid
+    status VARCHAR(50) -- Ordered, Received, Paid, Cancelled
+);
+
+CREATE TABLE purchase_items (
+    id SERIAL PRIMARY KEY,
+    purchase_id INTEGER REFERENCES purchases(id) ON DELETE CASCADE,
+    stock_item_id INTEGER REFERENCES stock_items(id),
+    quantity DECIMAL(10,2) NOT NULL,
+    unit_price DECIMAL(12,2) NOT NULL,
+    total_price DECIMAL(15,2) NOT NULL
+);
+
+CREATE TABLE quality_controls (
+    id SERIAL PRIMARY KEY,
+    purchase_id INTEGER REFERENCES purchases(id) ON DELETE CASCADE,
+    check_date DATE DEFAULT CURRENT_DATE,
+    is_conform BOOLEAN DEFAULT TRUE,
+    non_conformity_details TEXT,
+    action_taken TEXT, -- e.g., 'Returned', 'Accepted with discount'
+    controller_id INTEGER REFERENCES users(id)
+);
+
+CREATE TABLE supplier_price_history (
+    id SERIAL PRIMARY KEY,
+    supplier_id INTEGER REFERENCES suppliers(id) ON DELETE CASCADE,
+    stock_item_id INTEGER REFERENCES stock_items(id) ON DELETE CASCADE,
+    price DECIMAL(12,2) NOT NULL,
+    effective_date DATE DEFAULT CURRENT_DATE
 );
 
 -- ==========================================

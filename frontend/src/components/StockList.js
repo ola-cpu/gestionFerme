@@ -79,31 +79,49 @@ function StockList() {
         <thead>
           <tr>
             <th>Article</th>
+            <th>Catégorie</th>
             <th>Quantité</th>
             <th>Unité</th>
-            <th>Status</th>
+            <th>Status / Alertes</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {stocks.map(item => (
             <tr key={item.id}>
-              <td>{item.name}</td>
+              <td>
+                <strong>{item.name}</strong><br/>
+                <small style={{color: '#666'}}>Methode: {item.valuation_method}</small>
+              </td>
+              <td>{item.category_name}</td>
               <td>{item.current_stock}</td>
               <td>{item.unit}</td>
               <td>
-                {item.current_stock <= item.minimum_threshold ?
-                  <span style={{color: 'red'}}>Alerte Seuil</span> :
+                {item.current_stock <= item.minimum_threshold &&
+                  <div style={{color: 'red', fontWeight: 'bold'}}>⚠️ Seuil Critique</div>
+                }
+                {item.near_expiry_count > 0 &&
+                  <div style={{color: 'orange'}}>📅 {item.near_expiry_count} lot(s) proche expiration</div>
+                }
+                {item.current_stock > item.minimum_threshold && item.near_expiry_count === 0 &&
                   <span style={{color: 'green'}}>Correct</span>
                 }
               </td>
               <td>
-                <button onClick={() => handleDelete(item.id)} style={{color: 'red'}}>Supprimer</button>
+                <button onClick={() => {}} title="Détails/Lots">Lots</button>
+                <button onClick={() => {}} title="Mouvements">Mvts</button>
+                <button onClick={() => handleDelete(item.id)} style={{color: 'red'}}>Suppr.</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      <div style={{marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px'}}>
+        <h3>Inventaire Périodique</h3>
+        <p>Enregistrer les écarts constatés lors du comptage physique.</p>
+        <button disabled>Démarrer un inventaire</button>
+      </div>
     </div>
   );
 }
