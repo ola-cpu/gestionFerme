@@ -18,6 +18,7 @@ Centraliser toutes les données de la ferme pour améliorer la traçabilité, r�
 
 ## Dépannage (Troubleshooting)
 
+### Erreur Frontend: `react-scripts` non reconnu
 Si vous rencontrez l'erreur suivante lors du lancement du frontend :
 `'react-scripts' n’est pas reconnu en tant que commande interne ou externe, un programme exécutable ou un fichier de commandes.`
 
@@ -25,6 +26,16 @@ Cela signifie que les dépendances n'ont pas été installées correctement. Pou
 1. Assurez-vous d'être dans le dossier `frontend`.
 2. Supprimez le dossier `node_modules` s'il existe.
 3. Exécutez `npm install`.
+
+### Erreur Backend: `password authentication failed for user "postgres"`
+Si le backend affiche une erreur d'authentification PostgreSQL au démarrage ou lors du login :
+1. Naviguez vers le dossier `backend`.
+2. Créez un fichier nommé `.env` (si non existant).
+3. Copiez le contenu de `.env.example` dans `.env`.
+4. Modifiez la variable `DB_PASSWORD` dans `.env` pour qu'elle corresponde au mot de passe de votre instance PostgreSQL locale.
+5. Redémarrez le serveur backend.
+
+*Note: Le système dispose d'un mode "démo" qui permet de se connecter même si la base de données est inaccessible. Utilisez le nom d'utilisateur `admin` et le mot de passe `password`.*
 
 ## Installation
 
