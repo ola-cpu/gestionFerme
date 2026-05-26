@@ -1,8 +1,56 @@
 const express = require('express');
+const db = require('./src/config/db');
+const { authenticate } = require('./src/middleware/auth');
 const app = express();
 const port = 3001; // Changed to 3001 to avoid conflict with React (3000)
 
 app.use(express.json());
+
+// Auth Routes
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    // Simple mock authentication (password check would go here in a real app)
+    const result = await db.query(
+      'SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = $1 AND u.is_active = TRUE',
+      [username]
+    );
+
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role_name,
+        token: `mock-token-${user.id}`
+      });
+    } else {
+      // Demo fallback if DB is empty/missing
+      const roleMap = {
+          'admin': 'Admin',
+          'elevage': 'Chef d’élevage',
+          'magasin': 'Magasinier',
+          'veto': 'Vétérinaire/technicien',
+          'vente': 'Commercial',
+          'compta': 'RH/Comptable'
+      };
+      if (roleMap[username] && password === 'password') {
+          return res.json({
+              id: 999,
+              username: username,
+              role: roleMap[username],
+              token: `mock-token-999`
+          });
+      }
+      res.status(401).json({ error: 'Identifiants invalides' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Apply authentication middleware to all subsequent routes
+app.use(authenticate);
 
 // Routes
 const livestockRoutes = require('./src/routes/livestock');

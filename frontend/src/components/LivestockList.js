@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function LivestockList({ onSelectBatch }) {
+function LivestockList({ user, onSelectBatch }) {
   const [batches, setBatches] = useState([]);
   const [species, setSpecies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +20,7 @@ function LivestockList({ onSelectBatch }) {
 
   const fetchBatches = async () => {
     try {
-      const response = await fetch('/api/livestock');
+      const response = await fetch('/api/livestock', { headers: { 'X-User-ID': user?.id } });
       const data = await response.json();
       setBatches(data);
       setLoading(false);
@@ -32,7 +32,7 @@ function LivestockList({ onSelectBatch }) {
 
   const fetchSpecies = async () => {
     try {
-      const response = await fetch('/api/livestock/species');
+      const response = await fetch('/api/livestock/species', { headers: { 'X-User-ID': user?.id } });
       const data = await response.json();
       setSpecies(data);
     } catch (err) {
@@ -45,7 +45,7 @@ function LivestockList({ onSelectBatch }) {
     try {
       const response = await fetch('/api/livestock', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'X-User-ID': user?.id,  'Content-Type': 'application/json' },
         body: JSON.stringify(newBatch)
       });
       if (response.ok) {

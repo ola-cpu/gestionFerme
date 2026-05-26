@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { logAction } = require('../utils/auditLogger');
+const { authorize } = require('../middleware/auth');
+
+// Apply authorization to all stock routes
+router.use(authorize(['Magasinier', 'Chef d’élevage']));
 
 // GET all stock items with category name and alerts
 router.get('/', async (req, res) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function EmployeeList() {
+function EmployeeList({ user }) {
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [payrolls, setPayrolls] = useState([]);
@@ -11,16 +11,16 @@ function EmployeeList() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const empRes = await fetch('/api/personnel');
+        const empRes = await fetch('/api/personnel', { headers: { 'X-User-ID': user?.id } });
         setEmployees(await empRes.json());
 
-        const attRes = await fetch('/api/personnel/attendance');
+        const attRes = await fetch('/api/personnel/attendance', { headers: { 'X-User-ID': user?.id } });
         setAttendance(await attRes.json());
 
-        const payRes = await fetch('/api/personnel/payrolls');
+        const payRes = await fetch('/api/personnel/payrolls', { headers: { 'X-User-ID': user?.id } });
         setPayrolls(await payRes.json());
 
-        const schRes = await fetch('/api/personnel/schedules');
+        const schRes = await fetch('/api/personnel/schedules', { headers: { 'X-User-ID': user?.id } });
         setSchedules(await schRes.json());
 
         setLoading(false);

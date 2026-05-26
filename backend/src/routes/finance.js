@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { authorize } = require('../middleware/auth');
+
+// Apply authorization to all finance routes
+router.use(authorize(['RH/Comptable']));
 
 router.get('/', async (req, res) => {
   try {

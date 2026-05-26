@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function StockList() {
+function StockList({ user }) {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -12,7 +12,7 @@ function StockList() {
 
   const fetchStocks = async () => {
     try {
-      const response = await fetch('/api/stocks');
+      const response = await fetch('/api/stocks', { headers: { 'X-User-ID': user?.id } });
       const data = await response.json();
       setStocks(data);
       setLoading(false);
@@ -30,7 +30,7 @@ function StockList() {
     try {
       const response = await fetch('/api/stocks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'X-User-ID': user?.id,  'Content-Type': 'application/json' },
         body: JSON.stringify(newItem)
       });
       if (response.ok) {
@@ -46,7 +46,7 @@ function StockList() {
   const handleDelete = async (id) => {
     if (window.confirm('Supprimer cet article ?')) {
       try {
-        await fetch(`/api/stocks/${id}`, { method: 'DELETE' });
+        await fetch(`/api/stocks/${id}`, { headers: { 'X-User-ID': user?.id },  method: 'DELETE' });
         fetchStocks();
       } catch (err) {
         console.error(err);

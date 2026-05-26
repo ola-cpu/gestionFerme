@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 
-function TraceabilityReport() {
+function TraceabilityReport({ user }) {
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/livestock')
+    fetch('/api/livestock', { headers: { 'X-User-ID': user?.id } })
       .then(res => res.json())
       .then(data => setBatches(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error fetching batches:', err));
@@ -16,7 +16,7 @@ function TraceabilityReport() {
   const fetchReport = (id) => {
     if (!id) return;
     setLoading(true);
-    fetch(`/api/reports/traceability/batch/${id}`)
+    fetch(`/api/reports/traceability/batch/${id}`, { headers: { 'X-User-ID': user?.id } })
       .then(res => res.json())
       .then(data => {
         setReport(data);

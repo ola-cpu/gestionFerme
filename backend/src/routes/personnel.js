@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { authorize } = require('../middleware/auth');
+
+// Apply authorization to all personnel routes
+router.use(authorize(['RH/Comptable']));
 
 // --- EMPLOYEES ---
 router.get('/', async (req, res) => {

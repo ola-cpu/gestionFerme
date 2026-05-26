@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 
-function SaleList() {
+function SaleList({ user }) {
   const [sales, setSales] = useState([]);
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [view, setView] = useState('sales'); // sales, clients, catalog
 
   useEffect(() => {
-    fetch('/api/sales').then(res => res.json()).then(setSales).catch(() => {});
-    fetch('/api/sales/clients').then(res => res.json()).then(setClients).catch(() => {});
-    fetch('/api/stocks').then(res => res.json()).then(data => {
+    fetch('/api/sales', { headers: { 'X-User-ID': user?.id } }).then(res => res.json()).then(setSales).catch(() => {});
+    fetch('/api/sales/clients', { headers: { 'X-User-ID': user?.id } }).then(res => res.json()).then(setClients).catch(() => {});
+    fetch('/api/stocks', { headers: { 'X-User-ID': user?.id } }).then(res => res.json()).then(data => {
         // Filter products using the is_product boolean from the new schema
         setProducts(data.filter(i => i.is_product));
     }).catch(() => {});

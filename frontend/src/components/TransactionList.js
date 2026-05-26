@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 
-function TransactionList() {
+function TransactionList({ user }) {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState([]);
   const [view, setView] = useState('daily'); // daily or budgets
 
   useEffect(() => {
-    fetch('/api/finance')
+    fetch('/api/finance', { headers: { 'X-User-ID': user?.id } })
       .then(res => res.json())
       .then(data => setTransactions(data));
 
-    fetch('/api/finance/budgets')
+    fetch('/api/finance/budgets', { headers: { 'X-User-ID': user?.id } })
       .then(res => res.json())
       .then(data => setBudgets(data));
   }, []);

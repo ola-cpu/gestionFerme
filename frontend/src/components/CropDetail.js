@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function CropDetail({ cycleId, onBack }) {
+function CropDetail({ user, cycleId, onBack }) {
   const [cycle, setCycle] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [performance, setPerformance] = useState(null);
@@ -19,22 +19,22 @@ function CropDetail({ cycleId, onBack }) {
 
   const fetchData = async () => {
     try {
-      const cycleRes = await fetch(`/api/crops/${cycleId}`);
+      const cycleRes = await fetch(`/api/crops/${cycleId}`, { headers: { 'X-User-ID': user?.id } });
       const cycleData = await cycleRes.json();
       setCycle(cycleData);
 
-      const tasksRes = await fetch(`/api/crops/${cycleId}/tasks`);
+      const tasksRes = await fetch(`/api/crops/${cycleId}/tasks`, { headers: { 'X-User-ID': user?.id } });
       const tasksData = await tasksRes.json();
 
       // Fetch inputs for each task
       const tasksWithInputs = await Promise.all(tasksData.map(async (task) => {
-        const inputsRes = await fetch(`/api/crops/tasks/${task.id}/inputs`);
+        const inputsRes = await fetch(`/api/crops/tasks/${task.id}/inputs`, { headers: { 'X-User-ID': user?.id } });
         const inputsData = await inputsRes.json();
         return { ...task, inputs: inputsData };
       }));
       setTasks(tasksWithInputs);
 
-      const perfRes = await fetch(`/api/crops/${cycleId}/performance`);
+      const perfRes = await fetch(`/api/crops/${cycleId}/performance`, { headers: { 'X-User-ID': user?.id } });
       const perfData = await perfRes.json();
       setPerformance(perfData);
     } catch (err) {
@@ -44,7 +44,7 @@ function CropDetail({ cycleId, onBack }) {
 
   const fetchStockItems = async () => {
     try {
-      const res = await fetch('/api/stocks');
+      const res = await fetch('/api/stocks', { headers: { 'X-User-ID': user?.id } });
       const data = await res.json();
       setStockItems(data);
     } catch (err) {
@@ -57,7 +57,7 @@ function CropDetail({ cycleId, onBack }) {
     try {
       await fetch('/api/crops/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'X-User-ID': user?.id,  'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newTask, crop_cycle_id: cycleId })
       });
       setShowTaskForm(false);
@@ -73,7 +73,7 @@ function CropDetail({ cycleId, onBack }) {
     try {
       const res = await fetch('/api/crops/inputs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'X-User-ID': user?.id,  'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newInput, crop_task_id: showInputForm })
       });
       if (res.ok) {

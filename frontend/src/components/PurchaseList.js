@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function PurchaseList() {
+function PurchaseList({ user }) {
   const [purchases, setPurchases] = useState([]);
   const [requests, setRequests] = useState([]);
   const [view, setView] = useState('purchases'); // 'purchases' or 'requests'
@@ -12,7 +12,7 @@ function PurchaseList() {
 
   const fetchPurchases = async () => {
     try {
-      const res = await fetch('/api/purchases');
+      const res = await fetch('/api/purchases', { headers: { 'X-User-ID': user?.id } });
       const data = await res.json();
       setPurchases(data);
     } catch (err) {
@@ -22,7 +22,7 @@ function PurchaseList() {
 
   const fetchRequests = async () => {
     try {
-      const res = await fetch('/api/purchases/requests');
+      const res = await fetch('/api/purchases/requests', { headers: { 'X-User-ID': user?.id } });
       const data = await res.json();
       setRequests(data);
     } catch (err) {
