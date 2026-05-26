@@ -9,6 +9,8 @@ import EmployeeList from './components/EmployeeList';
 import TransactionList from './components/TransactionList';
 import LivestockList from './components/LivestockList';
 import LivestockDetail from './components/LivestockDetail';
+import MaintenanceModule from './components/MaintenanceModule';
+import Dashboard from './components/Dashboard';
 
 function App() {
   const [activeModule, setActiveModule] = useState(null);
@@ -22,7 +24,9 @@ function App() {
     { id: 'achats', name: 'Achats', icon: '🛒' },
     { id: 'ventes', name: 'Ventes', icon: '💰' },
     { id: 'personnel', name: 'Personnel', icon: '👥' },
-    { id: 'tresorerie', name: 'Trésorerie', icon: '🏦' }
+    { id: 'tresorerie', name: 'Trésorerie', icon: '🏦' },
+    { id: 'maintenance', name: 'Maintenance', icon: '🛠️' },
+    { id: 'dashboard', name: 'Tableaux de bord', icon: '📊' }
   ];
 
   const handleSelectBatch = (batch) => {
@@ -55,6 +59,10 @@ function App() {
         return <EmployeeList />;
       case 'tresorerie':
         return <TransactionList />;
+      case 'maintenance':
+        return <MaintenanceModule />;
+      case 'dashboard':
+        return <Dashboard />;
       default:
         return (
           <div className="module-grid">

@@ -378,15 +378,41 @@ CREATE TABLE transactions (
     date DATE NOT NULL,
     type VARCHAR(10), -- IN / OUT
     category VARCHAR(100),
+    activity VARCHAR(50), -- Élevage, Cultures, Atelier, General
+    source VARCHAR(50), -- Caisse, Banque
     amount DECIMAL(15,2),
     description TEXT
 );
--- Maintenance Table
+
+CREATE TABLE budgets (
+    id SERIAL PRIMARY KEY,
+    activity VARCHAR(50) NOT NULL, -- Élevage, Cultures, Atelier, etc.
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    allocated_amount DECIMAL(15,2) NOT NULL,
+    spent_amount DECIMAL(15,2) DEFAULT 0
+);
+
+-- ==========================================
+-- 8. MAINTENANCE & ACTIFS (Assets)
+-- ==========================================
+
+CREATE TABLE assets (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    category VARCHAR(50), -- Équipement, Véhicule, Bâtiment
+    purchase_date DATE,
+    purchase_price DECIMAL(15,2),
+    status VARCHAR(50) DEFAULT 'Actif' -- Actif, En maintenance, Hors service
+);
+
 CREATE TABLE maintenance_records (
     id SERIAL PRIMARY KEY,
-    asset_name VARCHAR(100) NOT NULL, -- Equipment, Vehicle, Building
+    asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
     maintenance_date DATE NOT NULL,
     description TEXT,
+    task_type VARCHAR(50), -- Entretien, Réparation
+    parts_used TEXT,
     cost DECIMAL(12,2),
     next_due_date DATE
 );
