@@ -1,8 +1,9 @@
 const express = require('express');
+require('dotenv').config();
 const db = require('./src/config/db');
 const { authenticate } = require('./src/middleware/auth');
 const app = express();
-const port = 3001; // Changed to 3001 to avoid conflict with React (3000)
+const port = process.env.PORT || 3001;
 
 app.use(express.json());
 
@@ -45,6 +46,7 @@ app.post('/api/auth/login', async (req, res) => {
       res.status(401).json({ error: 'Identifiants invalides' });
     }
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ error: err.message });
   }
 });
