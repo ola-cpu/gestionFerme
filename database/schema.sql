@@ -82,7 +82,10 @@ CREATE TABLE health_records (
     record_date DATE NOT NULL,
     type VARCHAR(100), -- Vaccination, Treatment, Deworming
     description TEXT,
-    cost DECIMAL(12,2)
+    cost DECIMAL(12,2),
+    vaccine_batch_number VARCHAR(50),
+    practitioner VARCHAR(100),
+    next_due_date DATE
 );
 
 CREATE TABLE feeding_records (
@@ -415,4 +418,29 @@ CREATE TABLE maintenance_records (
     parts_used TEXT,
     cost DECIMAL(12,2),
     next_due_date DATE
+);
+
+-- ==========================================
+-- 9. AUDIT & COMPLIANCE
+-- ==========================================
+
+CREATE TABLE audit_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    table_name VARCHAR(100),
+    record_id INTEGER,
+    details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE slaughter_records (
+    id SERIAL PRIMARY KEY,
+    batch_id INTEGER REFERENCES livestock_batches(id) ON DELETE CASCADE,
+    individual_id INTEGER REFERENCES livestock_individuals(id) ON DELETE CASCADE,
+    slaughter_date DATE NOT NULL,
+    location VARCHAR(255),
+    health_certificate_ref VARCHAR(100),
+    inspector_name VARCHAR(100),
+    details TEXT
 );

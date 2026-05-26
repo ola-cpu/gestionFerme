@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { logAction } = require('../utils/auditLogger');
 
 // GET all stock items with category name and alerts
 router.get('/', async (req, res) => {
@@ -44,7 +45,7 @@ router.get('/:id/movements', async (req, res) => {
 
 // POST a movement (IN/OUT)
 router.post('/:id/movements', async (req, res) => {
-  const { batch_id, movement_type, quantity, reason, unit_price } = req.body;
+  const { batch_id, movement_type, quantity, reason, unit_price, user_id } = req.body;
   const stock_item_id = req.params.id;
 
   try {
@@ -76,6 +77,8 @@ router.post('/:id/movements', async (req, res) => {
         [stock_item_id, 'LOT-' + Date.now(), quantity, quantity, unit_price]
       );
     }
+
+    await logAction(user_id, `STOCK_${movement_type}`, 'stock_items', stock_item_id, { quantity, reason });
 
     await db.query('COMMIT');
     res.status(201).json({ message: 'Movement recorded successfully' });

@@ -108,11 +108,44 @@ router.get('/:id/health', async (req, res) => {
 
 // POST a health record
 router.post('/health', async (req, res) => {
-  const { batch_id, individual_id, record_date, type, description, cost } = req.body;
+  const { batch_id, individual_id, record_date, type, description, cost, vaccine_batch_number, practitioner, next_due_date } = req.body;
   try {
     const result = await db.query(
-      'INSERT INTO health_records (batch_id, individual_id, record_date, type, description, cost) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [batch_id, individual_id, record_date, type, description, cost]
+      'INSERT INTO health_records (batch_id, individual_id, record_date, type, description, cost, vaccine_batch_number, practitioner, next_due_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [batch_id, individual_id, record_date, type, description, cost, vaccine_batch_number, practitioner, next_due_date]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- SLAUGHTER ---
+
+// GET slaughter records for a batch
+router.get('/:id/slaughter', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM slaughter_records WHERE batch_id = $1 ORDER BY slaughter_date DESC', [req.params.id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST a slaughter record
+router.post('/slaughter', async (req, res) => {
+  const { batch_id, individual_id, slaughter_date, location, health_certificate_ref, inspector_name, details } = req.body;
+  try {
+    // Update individual status if applicable
+    if (individual_id) {
+        await db.query('UPDATE livestock_individuals SET status = \'Sold\' WHERE id = $1', [individual_id]);
+    }
+    // Update batch count
+    await db.query('UPDATE livestock_batches SET current_count = current_count - 1 WHERE id = $1', [batch_id]);
+
+    const result = await db.query(
+      'INSERT INTO slaughter_records (batch_id, individual_id, slaughter_date, location, health_certificate_ref, inspector_name, details) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [batch_id, individual_id, slaughter_date, location, health_certificate_ref, inspector_name, details]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
