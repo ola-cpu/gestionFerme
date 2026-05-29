@@ -682,6 +682,8 @@ CREATE TABLE transactions (
     amount DECIMAL(15,2) NOT NULL,
     reference_number VARCHAR(100),
     description TEXT,
+    status VARCHAR(50) DEFAULT 'Soumis', -- Soumis, Validé, Rejeté
+    validated_by INTEGER REFERENCES users(id),
     user_id INTEGER REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -753,8 +755,9 @@ CREATE TABLE maintenance_interventions (
     report_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     fault_description TEXT NOT NULL,
     urgency VARCHAR(20) DEFAULT 'Normale', -- Basse, Normale, Haute, Critique
-    status VARCHAR(50) DEFAULT 'Ouvert', -- Ouvert, En cours, Résolu, Annulé
+    status VARCHAR(50) DEFAULT 'Ouvert', -- Ouvert, Approuvé, En cours, Résolu, Annulé
     assigned_technician_id INTEGER REFERENCES employees(id),
+    approved_by INTEGER REFERENCES users(id),
     resolution_details TEXT,
     resolved_at TIMESTAMP WITH TIME ZONE
 );

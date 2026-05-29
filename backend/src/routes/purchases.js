@@ -47,7 +47,7 @@ router.post('/requests', async (req, res) => {
 });
 
 // PUT update purchase request (Validation)
-router.put('/requests/:id', async (req, res) => {
+router.put('/requests/:id', authorize(['Chef d’élevage', 'Admin']), async (req, res) => {
   const { status, justification } = req.body;
   const validator_id = req.user.id;
   try {
@@ -65,6 +65,13 @@ router.post('/', async (req, res) => {
   const { supplier_id, purchase_date, total_amount, items, purchase_request_id } = req.body;
   try {
     await db.query('BEGIN');
+
+    if (purchase_request_id) {
+        const reqCheck = await db.query('SELECT status FROM purchase_requests WHERE id = $1', [purchase_request_id]);
+        if (reqCheck.rows[0].status !== 'Validé') {
+            throw new Error('La demande d\'achat doit être Validée avant de passer commande.');
+        }
+    }
 
     const purchaseResult = await db.query(
       'INSERT INTO purchases (supplier_id, purchase_request_id, purchase_date, total_amount, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
@@ -101,6 +108,12 @@ router.post('/:id/receptions', async (req, res) => {
 
   try {
     await db.query('BEGIN');
+
+    // 0. Check if purchase is ordered
+    const purchaseCheck = await db.query('SELECT status FROM purchases WHERE id = $1', [purchase_id]);
+    if (purchaseCheck.rows[0].status !== 'Ordered' && purchaseCheck.rows[0].status !== 'Partially Received') {
+        throw new Error('Seules les commandes au statut \'Ordered\' peuvent être réceptionnées.');
+    }
 
     // 1. Create reception record
     const receptionRes = await db.query(

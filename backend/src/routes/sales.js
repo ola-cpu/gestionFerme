@@ -64,6 +64,10 @@ async function processSaleItems(client, saleId, items, document_type, reference_
         if (item.individual_id && isConfirmed) {
             await db.query('UPDATE livestock_individuals SET status = \'Sold\' WHERE id = $1', [item.individual_id]);
         }
+
+        if (item.batch_id && isConfirmed) {
+            await db.query('UPDATE livestock_batches SET current_count = current_count - $1 WHERE id = $2', [item.quantity || 1, item.batch_id]);
+        }
     }
 }
 
@@ -235,17 +239,55 @@ router.get('/payments', async (req, res) => {
 });
 
 router.post('/payments', async (req, res) => {
-  const { sale_id, amount, payment_method, user_id } = req.body;
+  const { sale_id, amount, payment_method } = req.body;
+  const user_id = req.user.id;
   try {
+    await db.query('BEGIN');
+
+    // 1. Record the payment
     const result = await db.query(
       'INSERT INTO sale_payments (sale_id, amount, payment_method) VALUES ($1, $2, $3) RETURNING *',
       [sale_id, amount, payment_method]
     );
 
+    // 2. Automate Sales status update
+    const saleRes = await db.query('SELECT total_amount, reference_number FROM sales WHERE id = $1', [sale_id]);
+    const paymentsRes = await db.query('SELECT SUM(amount) as paid FROM sale_payments WHERE sale_id = $1', [sale_id]);
+
+    const totalAmount = parseFloat(saleRes.rows[0].total_amount);
+    const totalPaid = parseFloat(paymentsRes.rows[0].paid);
+    const reference = saleRes.rows[0].reference_number;
+
+    let newStatus = 'Partial';
+    if (totalPaid >= totalAmount) newStatus = 'Paid';
+
+    await db.query('UPDATE sales SET payment_status = $1 WHERE id = $2', [newStatus, sale_id]);
+
+    // 3. Create Finance transaction (Link to Finance)
+    // Defaulting to first bank account if none provided, or a dedicated 'Caisse' account could be found
+    const bankAccRes = await db.query('SELECT id FROM bank_accounts WHERE is_active = TRUE LIMIT 1');
+    const bankAccountId = bankAccRes.rows.length > 0 ? bankAccRes.rows[0].id : null;
+
+    if (bankAccountId) {
+        await db.query(
+            `INSERT INTO transactions (bank_account_id, date, type, category, activity, amount, reference_number, description, status, user_id)
+             VALUES ($1, CURRENT_DATE, 'ENTRÉE', 'Vente', 'Commercial', $2, $3, $4, 'Validé', $5)`,
+            [bankAccountId, amount, reference, `Paiement pour vente #${reference}`, user_id]
+        );
+
+        // Update balance immediately as it's a confirmed sale payment
+        await db.query(
+            'UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2',
+            [amount, bankAccountId]
+        );
+    }
+
     await logAction(user_id, 'RECORD_PAYMENT', 'sale_payments', result.rows[0].id, { sale_id, amount });
 
+    await db.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    await db.query('ROLLBACK');
     res.status(500).json({ error: err.message });
   }
 });

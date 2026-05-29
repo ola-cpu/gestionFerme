@@ -165,8 +165,14 @@ router.post('/health', async (req, res) => {
     );
 
     // Decrement stock if medicine/vaccine used
+    let actualCost = cost;
     if (stock_item_id && quantity) {
-        await deductStockFIFO(stock_item_id, warehouse_id, quantity, `Soins animal/lot #${individual_id || batch_id}`, user_id);
+        const stockCost = await deductStockFIFO(stock_item_id, warehouse_id || 1, quantity, `Soins animal/lot #${individual_id || batch_id}`, user_id);
+        if (!cost) {
+            actualCost = stockCost;
+            await db.query('UPDATE health_records SET cost = $1 WHERE id = $2', [actualCost, result.rows[0].id]);
+            result.rows[0].cost = actualCost;
+        }
     }
 
     await db.query('COMMIT');
@@ -235,8 +241,14 @@ router.post('/feeding', async (req, res) => {
     );
 
     // Decrement stock for animal feed
+    let actualCost = cost;
     if (stock_item_id && quantity) {
-        await deductStockFIFO(stock_item_id, warehouse_id, quantity, `Alimentation lot #${batch_id}`, user_id);
+        const stockCost = await deductStockFIFO(stock_item_id, warehouse_id || 1, quantity, `Alimentation lot #${batch_id}`, user_id);
+        if (!cost) {
+            actualCost = stockCost;
+            await db.query('UPDATE feeding_records SET cost = $1 WHERE id = $2', [actualCost, result.rows[0].id]);
+            result.rows[0].cost = actualCost;
+        }
     }
 
     await db.query('COMMIT');

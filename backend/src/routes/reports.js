@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { checkAndGenerateAlerts } = require('../utils/alertUtils');
 
 // GET KPIs for the dashboard
 router.get('/kpis', async (req, res) => {
@@ -75,15 +76,21 @@ router.get('/kpis', async (req, res) => {
 // GET alerts
 router.get('/alerts', async (req, res) => {
   try {
-    const stockAlerts = await db.query('SELECT name, current_stock, minimum_threshold FROM stock_items WHERE current_stock <= minimum_threshold');
-    const expiryAlerts = await db.query('SELECT batch_number, expiry_date FROM stock_batches WHERE expiry_date <= CURRENT_DATE + INTERVAL \'30 days\'');
-    const maintenanceAlerts = await db.query('SELECT a.name, p.task_name, p.next_due_date FROM maintenance_plans p JOIN assets a ON p.asset_id = a.id WHERE p.next_due_date <= CURRENT_DATE + INTERVAL \'7 days\' AND p.is_active = TRUE');
+    // Run alert generation logic
+    await checkAndGenerateAlerts();
+
+    const stockAlerts = await db.query('SELECT * FROM alerts WHERE type = \'Stock\' AND status = \'Pending\'');
+    const expiryAlerts = await db.query('SELECT * FROM alerts WHERE type = \'Expiry\' AND status = \'Pending\'');
+    const maintenanceAlerts = await db.query('SELECT * FROM alerts WHERE type = \'Maintenance\' AND status = \'Pending\'');
+    const healthAlerts = await db.query('SELECT * FROM alerts WHERE type = \'Vaccine\' AND status = \'Pending\'');
+    const financeAlerts = await db.query('SELECT * FROM alerts WHERE type = \'Finance\' AND status = \'Pending\'');
 
     res.json({
       stock: stockAlerts.rows,
       expiry: expiryAlerts.rows,
       maintenance: maintenanceAlerts.rows,
-      unpaid_sales: 2 // Mock count
+      health: healthAlerts.rows,
+      finance: financeAlerts.rows
     });
   } catch (err) {
     res.json({
@@ -140,6 +147,54 @@ router.get('/export/stock', (req, res) => {
 
 router.get('/export/maintenance', (req, res) => {
   exportToCSV(res, 'SELECT * FROM maintenance_records', 'historique_maintenance.csv');
+});
+
+// GET Profitability per Batch
+router.get('/profitability/livestock', async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT
+                b.id, b.batch_name,
+                COALESCE(SUM(si.total_price), 0) as total_sales,
+                COALESCE((SELECT SUM(cost) FROM feeding_records WHERE batch_id = b.id), 0) as total_feeding_cost,
+                COALESCE((SELECT SUM(cost) FROM health_records WHERE batch_id = b.id), 0) as total_health_cost,
+                (COALESCE(SUM(si.total_price), 0) -
+                 (COALESCE((SELECT SUM(cost) FROM feeding_records WHERE batch_id = b.id), 0) +
+                  COALESCE((SELECT SUM(cost) FROM health_records WHERE batch_id = b.id), 0))) as net_profit
+            FROM livestock_batches b
+            LEFT JOIN sale_items si ON b.id = si.batch_id
+            GROUP BY b.id, b.batch_name
+            ORDER BY net_profit DESC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET Profitability per Crop Cycle
+router.get('/profitability/crops', async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT
+                c.id, c.crop_name,
+                (c.actual_yield * si.sale_price) as harvest_value,
+                COALESCE((SELECT SUM(cost) FROM crop_tasks WHERE crop_cycle_id = c.id), 0) +
+                COALESCE((SELECT SUM(ci.cost) FROM crop_inputs ci JOIN crop_tasks ct ON ci.crop_task_id = ct.id WHERE ct.crop_cycle_id = c.id), 0) +
+                COALESCE((SELECT SUM(cost) FROM irrigation_records WHERE crop_cycle_id = c.id), 0) as total_cost,
+                ((c.actual_yield * si.sale_price) -
+                 (COALESCE((SELECT SUM(cost) FROM crop_tasks WHERE crop_cycle_id = c.id), 0) +
+                  COALESCE((SELECT SUM(ci.cost) FROM crop_inputs ci JOIN crop_tasks ct ON ci.crop_task_id = ct.id WHERE ct.crop_cycle_id = c.id), 0) +
+                  COALESCE((SELECT SUM(cost) FROM irrigation_records WHERE crop_cycle_id = c.id), 0))) as net_profit
+            FROM crop_cycles c
+            LEFT JOIN stock_items si ON c.crop_name = si.name
+            WHERE c.actual_yield IS NOT NULL
+            ORDER BY net_profit DESC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // GET Traceability report for a batch

@@ -14,7 +14,7 @@ const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 function Dashboard({ user }) {
   const [kpis, setKpis] = useState({});
-  const [alerts, setAlerts] = useState({ stock: [], expiry: [], maintenance: [] });
+  const [alerts, setAlerts] = useState({ stock: [], expiry: [], maintenance: [], health: [], finance: [] });
 
   useEffect(() => {
     const headers = { 'X-User-ID': user?.id };
@@ -181,15 +181,21 @@ function Dashboard({ user }) {
           </div>
           <div className="space-y-3">
             {alerts.maintenance?.slice(0, 2).map((m, i) => (
-              <AlertItem key={i} type="info" title="Maintenance à venir" desc={`${m.name}: ${m.task_name}`} date={m.next_due_date} />
+              <AlertItem key={i} type="info" title="Maintenance" desc={m.message} date={new Date(m.created_at).toLocaleDateString()} />
             ))}
             {alerts.stock?.slice(0, 2).map((s, i) => (
-              <AlertItem key={i} type="warning" title="Stock Faible" desc={`${s.name}: ${s.current_stock} restant`} date={`Seuil: ${s.minimum_threshold}`} />
+              <AlertItem key={i} type="warning" title="Stock" desc={s.message} date={new Date(s.created_at).toLocaleDateString()} />
             ))}
             {alerts.expiry?.slice(0, 2).map((e, i) => (
-              <AlertItem key={i} type="danger" title="Péremption imminente" desc={`Batch ${e.batch_number}`} date={e.expiry_date} />
+              <AlertItem key={i} type="danger" title="Péremption" desc={e.message} date={new Date(e.created_at).toLocaleDateString()} />
             ))}
-            {(!alerts.maintenance?.length && !alerts.stock?.length && !alerts.expiry?.length) && (
+            {alerts.health?.slice(0, 2).map((h, i) => (
+              <AlertItem key={i} type="info" title="Sanitaire" desc={h.message} date={new Date(h.created_at).toLocaleDateString()} />
+            ))}
+            {alerts.finance?.slice(0, 2).map((f, i) => (
+              <AlertItem key={i} type="danger" title="Finance" desc={f.message} date={new Date(f.created_at).toLocaleDateString()} />
+            ))}
+            {(!alerts.maintenance?.length && !alerts.stock?.length && !alerts.expiry?.length && !alerts.health?.length && !alerts.finance?.length) && (
               <p className="text-center py-8 text-slate-400 text-sm italic">Aucune alerte pour le moment</p>
             )}
           </div>
