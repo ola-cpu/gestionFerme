@@ -106,7 +106,8 @@ CREATE TABLE livestock_individuals (
     birth_date DATE,
     gender VARCHAR(10), -- Male, Female
     provenance VARCHAR(100),
-    status VARCHAR(50) DEFAULT 'Active' -- Active, Sold, Deceased, Reproducteur, Engraissement, Gestante, Malade, Réformé
+    status VARCHAR(50) DEFAULT 'Active', -- Active, Sold, Deceased, Reproducteur, Engraissement, Gestante, Malade, Réformé
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE weight_records (
@@ -212,7 +213,8 @@ CREATE TABLE stock_items (
     is_product BOOLEAN DEFAULT FALSE,
     sale_price DECIMAL(12,2) DEFAULT 0,
     image_url TEXT,
-    technical_sheet_url TEXT
+    technical_sheet_url TEXT,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE stock_batches (
@@ -318,7 +320,8 @@ CREATE TABLE crop_cycles (
     planting_date DATE,
     harvest_date DATE,
     expected_yield DECIMAL(10,2),
-    actual_yield DECIMAL(10,2)
+    actual_yield DECIMAL(10,2),
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE agronomic_observations (
@@ -399,7 +402,10 @@ CREATE TABLE purchases (
     purchase_request_id INTEGER REFERENCES purchase_requests(id) ON DELETE SET NULL,
     purchase_date DATE NOT NULL,
     total_amount DECIMAL(15,2),
-    status VARCHAR(50) -- Ordered, Received, Paid, Cancelled
+    status VARCHAR(50), -- Ordered, Received, Paid, Cancelled
+    is_validated BOOLEAN DEFAULT FALSE,
+    validation_date TIMESTAMP WITH TIME ZONE,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE purchase_items (
@@ -479,7 +485,8 @@ CREATE TABLE sales (
     document_type VARCHAR(50), -- Devis, Bon de commande, Facture
     reference_number VARCHAR(50) UNIQUE,
     delivery_status VARCHAR(50) DEFAULT 'Pending', -- Pending, Shipped, Delivered
-    valid_until DATE -- For Devis
+    valid_until DATE, -- For Devis
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE deliveries (
@@ -685,7 +692,10 @@ CREATE TABLE transactions (
     status VARCHAR(50) DEFAULT 'Soumis', -- Soumis, Validé, Rejeté
     validated_by INTEGER REFERENCES users(id),
     user_id INTEGER REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_validated BOOLEAN DEFAULT FALSE,
+    validation_date TIMESTAMP WITH TIME ZONE,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE debts_receivables (
@@ -833,4 +843,17 @@ CREATE TABLE alerts (
     table_name VARCHAR(50),
     status VARCHAR(20) DEFAULT 'Pending', -- Pending, Resolved
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE documents (
+    id SERIAL PRIMARY KEY,
+    file_url TEXT NOT NULL,
+    file_name VARCHAR(255),
+    document_type VARCHAR(50), -- Facture, Contrat, Certificat, Ordonnance, Scan
+    entity_type VARCHAR(50) NOT NULL, -- Livestock, Crop, Sale, Purchase, Employee, Asset
+    entity_id INTEGER NOT NULL,
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    uploaded_by INTEGER REFERENCES users(id),
+    notes TEXT,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );

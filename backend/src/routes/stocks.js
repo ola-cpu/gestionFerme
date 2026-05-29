@@ -20,15 +20,14 @@ router.get('/', async (req, res) => {
     `;
 
     const params = [];
+    query += ' WHERE si.deleted_at IS NULL';
     if (warehouse_id || category_id) {
-        query += ' WHERE ';
         if (warehouse_id) {
-            query += 'si.id IN (SELECT stock_item_id FROM stock_batches WHERE warehouse_id = $1)';
+            query += ' AND si.id IN (SELECT stock_item_id FROM stock_batches WHERE warehouse_id = $' + (params.length + 1) + ')';
             params.push(warehouse_id);
         }
         if (category_id) {
-            if (warehouse_id) query += ' AND ';
-            query += 'si.category_id = $' + (params.length + 1);
+            query += ' AND si.category_id = $' + (params.length + 1);
             params.push(category_id);
         }
     }
@@ -176,7 +175,7 @@ router.put('/:id', async (req, res) => {
 // DELETE stock item
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await db.query('DELETE FROM stock_items WHERE id = $1 RETURNING *', [req.params.id]);
+    const result = await db.query('UPDATE stock_items SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted successfully' });
   } catch (err) {

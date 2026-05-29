@@ -11,7 +11,7 @@ router.use(authorize(['Commercial']));
 // --- SALES ---
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM sales ORDER BY id DESC');
+    const result = await db.query('SELECT * FROM sales WHERE deleted_at IS NULL ORDER BY id DESC');
     res.json(result.rows);
   } catch (err) {
     res.json([{
@@ -195,7 +195,7 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM sales WHERE id = $1', [req.params.id]);
+    await db.query('UPDATE sales SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [req.params.id]);
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

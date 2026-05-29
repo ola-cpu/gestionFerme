@@ -108,6 +108,7 @@ router.get('/', async (req, res) => {
       JOIN plots p ON c.plot_id = p.id
       LEFT JOIN crop_types ct ON c.crop_type_id = ct.id
       LEFT JOIN agricultural_campaigns ac ON c.campaign_id = ac.id
+      WHERE c.deleted_at IS NULL
       ORDER BY c.planting_date DESC
     `);
     res.json(result.rows);
@@ -325,6 +326,90 @@ router.post('/irrigation', async (req, res) => {
 
 // --- PERFORMANCE ---
 
+router.get('/:id/fertilizer-needs', async (req, res) => {
+  try {
+    const cycleRes = await db.query(`
+        SELECT c.*, p.area_hectares, ct.fertilizer_needs
+        FROM crop_cycles c
+        JOIN plots p ON c.plot_id = p.id
+        LEFT JOIN crop_types ct ON c.crop_type_id = ct.id
+        WHERE c.id = $1
+    `, [req.params.id]);
+
+    if (cycleRes.rows.length === 0) return res.status(404).json({ error: 'Cycle non trouvé' });
+    const cycle = cycleRes.rows[0];
+
+    // Simple parsing of fertilizer_needs (e.g., "100kg NPK/ha")
+    let needsPerHa = 0;
+    if (cycle.fertilizer_needs) {
+        const match = cycle.fertilizer_needs.match(/(\d+)/);
+        if (match) needsPerHa = parseInt(match[1]);
+    }
+
+    const totalNeeded = (cycle.area_hectares || 0) * needsPerHa;
+
+    res.json({
+        plot_area: cycle.area_hectares,
+        needs_per_ha: needsPerHa,
+        total_fertilizer_needed: totalNeeded,
+        description: cycle.fertilizer_needs
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/plots/:id/rotation-recommendation', async (req, res) => {
+  try {
+    const plotId = req.params.id;
+    // Get last 3 cycles for this plot
+    const history = await db.query(
+      'SELECT crop_name, harvest_date FROM crop_cycles WHERE plot_id = $1 ORDER BY harvest_date DESC LIMIT 3',
+      [plotId]
+    );
+
+    let recommendation = 'Rotation standard recommandée';
+    if (history.rows.length > 0) {
+        const lastCrop = history.rows[0].crop_name.toLowerCase();
+        if (lastCrop.includes('maïs') || lastCrop.includes('céréale')) {
+            recommendation = 'Légumineuse recommandée (Soja, Arachide) pour enrichir le sol en azote.';
+        } else if (lastCrop.includes('soja') || lastCrop.includes('arachide') || lastCrop.includes('légumineuse')) {
+            recommendation = 'Céréale recommandée (Maïs, Mil) pour profiter de l\'azote fixé.';
+        }
+    }
+
+    res.json({ plot_id: plotId, history: history.rows, recommendation });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id/forecast', async (req, res) => {
+  try {
+    const cycleRes = await db.query(`
+        SELECT c.*, p.area_hectares, ct.expected_yield_per_ha
+        FROM crop_cycles c
+        JOIN plots p ON c.plot_id = p.id
+        LEFT JOIN crop_types ct ON c.crop_type_id = ct.id
+        WHERE c.id = $1
+    `, [req.params.id]);
+
+    if (cycleRes.rows.length === 0) return res.status(404).json({ error: 'Cycle non trouvé' });
+    const cycle = cycleRes.rows[0];
+
+    const predictedYield = (cycle.area_hectares || 0) * (cycle.expected_yield_per_ha || 0);
+
+    res.json({
+        plot_area: cycle.area_hectares,
+        expected_yield_per_ha: cycle.expected_yield_per_ha,
+        predicted_total_yield: predictedYield,
+        unit: 'kg'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id/performance', async (req, res) => {
     try {
       const cycleId = req.params.id;
@@ -375,7 +460,7 @@ router.get('/:id/performance', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM crop_cycles WHERE id = $1', [req.params.id]);
+    await db.query('UPDATE crop_cycles SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [req.params.id]);
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
