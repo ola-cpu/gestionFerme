@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { authorize } = require('../middleware/auth');
+const { deductStockFIFO } = require('../utils/stockUtils');
 
 // Apply authorization to all livestock routes
 router.use(authorize(['Chef d’élevage', 'Vétérinaire/technicien']));
@@ -135,14 +136,25 @@ router.get('/:id/health', async (req, res) => {
 
 // POST a health record
 router.post('/health', async (req, res) => {
-  const { batch_id, individual_id, record_date, type, description, cost, vaccine_batch_number, practitioner, next_due_date } = req.body;
+  const { batch_id, individual_id, record_date, type, description, cost, vaccine_batch_number, practitioner, next_due_date, stock_item_id, quantity, warehouse_id } = req.body;
+  const user_id = req.user.id;
   try {
+    await db.query('BEGIN');
+
     const result = await db.query(
       'INSERT INTO health_records (batch_id, individual_id, record_date, type, description, cost, vaccine_batch_number, practitioner, next_due_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
       [batch_id, individual_id, record_date, type, description, cost, vaccine_batch_number, practitioner, next_due_date]
     );
+
+    // Decrement stock if medicine/vaccine used
+    if (stock_item_id && quantity) {
+        await deductStockFIFO(stock_item_id, warehouse_id, quantity, `Soins animal/lot #${individual_id || batch_id}`, user_id);
+    }
+
+    await db.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    await db.query('ROLLBACK');
     res.status(500).json({ error: err.message });
   }
 });
@@ -194,14 +206,25 @@ router.get('/:id/feeding', async (req, res) => {
 
 // POST a feeding record
 router.post('/feeding', async (req, res) => {
-  const { batch_id, record_date, feed_type, quantity, unit, cost } = req.body;
+  const { batch_id, record_date, feed_type, quantity, unit, cost, stock_item_id, warehouse_id } = req.body;
+  const user_id = req.user.id;
   try {
+    await db.query('BEGIN');
+
     const result = await db.query(
       'INSERT INTO feeding_records (batch_id, record_date, feed_type, quantity, unit, cost) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [batch_id, record_date, feed_type, quantity, unit, cost]
     );
+
+    // Decrement stock for animal feed
+    if (stock_item_id && quantity) {
+        await deductStockFIFO(stock_item_id, warehouse_id, quantity, `Alimentation lot #${batch_id}`, user_id);
+    }
+
+    await db.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    await db.query('ROLLBACK');
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import StockList from './components/StockList';
+import WarehouseManagement from './components/WarehouseManagement';
+import StockTransfer from './components/StockTransfer';
+import InventoryModule from './components/InventoryModule';
 import CropsList from './components/CropsList';
 import CropDetail from './components/CropDetail';
 import PurchaseList from './components/PurchaseList';
@@ -43,6 +46,9 @@ function App() {
     { id: 'elevage', name: 'Élevage', icon: '🐄', roles: ['Chef d’élevage', 'Vétérinaire/technicien'] },
     { id: 'cultures', name: 'Cultures', icon: '🌾', roles: ['Chef d’élevage', 'Magasinier'] },
     { id: 'stocks', name: 'Stocks', icon: '📦', roles: ['Magasinier', 'Chef d’élevage'] },
+    { id: 'warehouses', name: 'Magasins', icon: '🏢', roles: ['Magasinier', 'Admin'] },
+    { id: 'transfers', name: 'Transferts', icon: '🚚', roles: ['Magasinier'] },
+    { id: 'inventory', name: 'Inventaire', icon: '📋', roles: ['Magasinier'] },
     { id: 'achats', name: 'Achats', icon: '🛒', roles: ['Magasinier', 'Chef d’élevage'] },
     { id: 'ventes', name: 'Ventes', icon: '💰', roles: ['Commercial'] },
     { id: 'personnel', name: 'Personnel', icon: '👥', roles: ['RH/Comptable'] },
@@ -79,6 +85,12 @@ function App() {
     switch (activeModule) {
       case 'stocks':
         return <StockList user={user} />;
+      case 'warehouses':
+        return <WarehouseManagement user={user} />;
+      case 'transfers':
+        return <StockTransfer user={user} />;
+      case 'inventory':
+        return <InventoryModule user={user} />;
       case 'achats':
         return <PurchaseList user={user} />;
       case 'ventes':

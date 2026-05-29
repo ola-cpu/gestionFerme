@@ -160,8 +160,27 @@ CREATE TABLE mortality_records (
 -- 2. STOCKS & MAGASIN
 -- ==========================================
 
+CREATE TABLE warehouses (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(50), -- Magasin, Entrepôt, Dépôt
+    location TEXT,
+    capacity DECIMAL(10,2),
+    manager_id INTEGER REFERENCES users(id),
+    conditions TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE storage_zones (
+    id SERIAL PRIMARY KEY,
+    warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
 CREATE TABLE stock_categories (
     id SERIAL PRIMARY KEY,
+    parent_id INTEGER REFERENCES stock_categories(id),
     name VARCHAR(100) NOT NULL
 );
 
@@ -171,18 +190,24 @@ INSERT INTO stock_categories (name) VALUES
 CREATE TABLE stock_items (
     id SERIAL PRIMARY KEY,
     category_id INTEGER REFERENCES stock_categories(id),
+    code VARCHAR(50) UNIQUE,
+    qr_code VARCHAR(100) UNIQUE,
     name VARCHAR(100) NOT NULL,
     unit VARCHAR(20), -- kg, L, unit
     minimum_threshold DECIMAL(10,2),
+    maximum_threshold DECIMAL(10,2),
     current_stock DECIMAL(10,2) DEFAULT 0,
     valuation_method VARCHAR(10) DEFAULT 'CMUP', -- FIFO, CMUP
     is_product BOOLEAN DEFAULT FALSE,
-    sale_price DECIMAL(12,2) DEFAULT 0
+    sale_price DECIMAL(12,2) DEFAULT 0,
+    image_url TEXT,
+    technical_sheet_url TEXT
 );
 
 CREATE TABLE stock_batches (
     id SERIAL PRIMARY KEY,
     stock_item_id INTEGER REFERENCES stock_items(id) ON DELETE CASCADE,
+    warehouse_id INTEGER REFERENCES warehouses(id),
     batch_number VARCHAR(50) NOT NULL,
     expiry_date DATE,
     initial_quantity DECIMAL(10,2) NOT NULL,
@@ -195,10 +220,23 @@ CREATE TABLE stock_movements (
     id SERIAL PRIMARY KEY,
     stock_item_id INTEGER REFERENCES stock_items(id) ON DELETE CASCADE,
     batch_id INTEGER REFERENCES stock_batches(id) ON DELETE SET NULL,
+    warehouse_id INTEGER REFERENCES warehouses(id),
     movement_type VARCHAR(10) NOT NULL, -- IN, OUT, ADJUST
     quantity DECIMAL(10,2) NOT NULL,
     movement_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     reason TEXT, -- e.g., 'Purchase', 'Use in Crops', 'Inventory Discrepancy'
+    user_id INTEGER REFERENCES users(id)
+);
+
+CREATE TABLE stock_transfers (
+    id SERIAL PRIMARY KEY,
+    from_warehouse_id INTEGER REFERENCES warehouses(id),
+    to_warehouse_id INTEGER REFERENCES warehouses(id),
+    stock_item_id INTEGER REFERENCES stock_items(id),
+    batch_id INTEGER REFERENCES stock_batches(id),
+    quantity DECIMAL(10,2) NOT NULL,
+    transfer_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'Completed', -- Pending, Completed, Cancelled
     user_id INTEGER REFERENCES users(id)
 );
 
