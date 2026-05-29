@@ -257,12 +257,14 @@ router.post('/inputs', async (req, res) => {
       await db.query('BEGIN');
 
       // 1. Check stock and decrease it using FIFO logic
-      await deductStockFIFO(stock_item_id, warehouse_id, quantity, `Utilisation culture - tâche #${crop_task_id}`, user_id);
+      const stockCost = await deductStockFIFO(stock_item_id, warehouse_id || 1, quantity, `Utilisation culture - tâche #${crop_task_id}`, user_id);
+
+      const actualCost = cost || stockCost;
 
       // 2. Insert input record
       const result = await db.query(
         'INSERT INTO crop_inputs (crop_task_id, stock_item_id, quantity, unit, cost) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [crop_task_id, stock_item_id, quantity, unit, cost]
+        [crop_task_id, stock_item_id, quantity, unit, actualCost]
       );
 
       await db.query('COMMIT');

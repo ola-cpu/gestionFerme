@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { authorize } = require('../middleware/auth');
 const { deductStockFIFO } = require('../utils/stockUtils');
+
+// Apply authorization
+router.use(authorize(['Chef d’élevage', 'Magasinier']));
 
 // --- MAINTENANCE RECORDS ---
 
@@ -72,6 +76,10 @@ router.post('/', async (req, res) => {
 
     // 4. Update intervention status if linked
     if (intervention_id) {
+      const intCheck = await db.query('SELECT status FROM maintenance_interventions WHERE id = $1', [intervention_id]);
+      if (intCheck.rows[0].status !== 'Approuvé' && intCheck.rows[0].status !== 'En cours') {
+          throw new Error('L\'intervention doit être Approuvée avant d\'être clôturée par un rapport.');
+      }
       await db.query(
         'UPDATE maintenance_interventions SET status = \'Résolu\', resolved_at = CURRENT_TIMESTAMP WHERE id = $1',
         [intervention_id]
@@ -139,7 +147,7 @@ router.get('/interventions', async (req, res) => {
 
 router.post('/interventions', async (req, res) => {
   const { asset_id, fault_description, urgency, assigned_technician_id } = req.body;
-  const reporter_id = req.headers['x-user-id'];
+  const reporter_id = req.user.id;
   try {
     await db.query('BEGIN');
     const result = await db.query(
@@ -153,6 +161,42 @@ router.post('/interventions', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     await db.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT approve/update intervention status
+router.put('/interventions/:id', authorize(['Chef d’élevage', 'Admin']), async (req, res) => {
+  const { status, assigned_technician_id, resolution_details } = req.body;
+  const user_id = req.user.id;
+  try {
+    const updateFields = [];
+    const params = [req.params.id];
+    let paramIdx = 2;
+
+    if (status) {
+        updateFields.push(`status = $${paramIdx++}`);
+        params.push(status);
+        if (status === 'Approuvé') {
+            updateFields.push(`approved_by = $${paramIdx++}`);
+            params.push(user_id);
+        }
+    }
+    if (assigned_technician_id) {
+        updateFields.push(`assigned_technician_id = $${paramIdx++}`);
+        params.push(assigned_technician_id);
+    }
+    if (resolution_details) {
+        updateFields.push(`resolution_details = $${paramIdx++}`);
+        params.push(resolution_details);
+    }
+
+    if (updateFields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+    const query = `UPDATE maintenance_interventions SET ${updateFields.join(', ')} WHERE id = $1 RETURNING *`;
+    const result = await db.query(query, params);
+    res.json(result.rows[0]);
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -45,29 +45,34 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { bank_account_id, date, type, category, activity, amount, reference_number, description } = req.body;
+  const { bank_account_id, date, type, category, activity, amount, reference_number, description, status } = req.body;
+  const user_id = req.user.id;
   try {
     // Start transaction
     await db.query('BEGIN');
 
+    const txStatus = status || 'Soumis';
+
     const result = await db.query(
-      'INSERT INTO transactions (bank_account_id, date, type, category, activity, amount, reference_number, description, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [bank_account_id, date, type, category, activity, amount, reference_number, description, req.user.id]
+      'INSERT INTO transactions (bank_account_id, date, type, category, activity, amount, reference_number, description, status, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [bank_account_id, date, type, category, activity, amount, reference_number, description, txStatus, user_id]
     );
 
-    // Update bank account balance
-    const balanceChange = (type === 'ENTRÉE' ? amount : -amount);
-    await db.query(
-        'UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2',
-        [balanceChange, bank_account_id]
-    );
-
-    // If it's an expense, update the corresponding budget
-    if (type === 'SORTIE' && activity) {
+    // Update bank account balance only if validated
+    if (txStatus === 'Validé') {
+        const balanceChange = (type === 'ENTRÉE' ? amount : -amount);
         await db.query(
-            'UPDATE budgets SET spent_amount = spent_amount + $1 WHERE activity = $2 AND period_start <= $3 AND period_end >= $3',
-            [amount, activity, date]
+            'UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2',
+            [balanceChange, bank_account_id]
         );
+
+        // If it's an expense, update the corresponding budget
+        if (type === 'SORTIE' && activity) {
+            await db.query(
+                'UPDATE budgets SET spent_amount = spent_amount + $1 WHERE activity = $2 AND period_start <= $3 AND period_end >= $3',
+                [amount, activity, date]
+            );
+        }
     }
 
     await db.query('COMMIT');
@@ -76,6 +81,48 @@ router.post('/', async (req, res) => {
     await db.query('ROLLBACK');
     res.status(500).json({ error: err.message });
   }
+});
+
+// PUT validate transaction
+router.put('/:id/validate', authorize(['RH/Comptable', 'Admin']), async (req, res) => {
+    const { status } = req.body;
+    const validator_id = req.user.id;
+    try {
+        await db.query('BEGIN');
+
+        const txRes = await db.query('SELECT * FROM transactions WHERE id = $1', [req.params.id]);
+        if (txRes.rows.length === 0) throw new Error('Transaction non trouvée');
+        const tx = txRes.rows[0];
+
+        if (tx.status === 'Validé') throw new Error('Transaction déjà validée');
+
+        if (status === 'Validé') {
+            // Update balance and budget
+            const balanceChange = (tx.type === 'ENTRÉE' ? tx.amount : -tx.amount);
+            await db.query(
+                'UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2',
+                [balanceChange, tx.bank_account_id]
+            );
+
+            if (tx.type === 'SORTIE' && tx.activity) {
+                await db.query(
+                    'UPDATE budgets SET spent_amount = spent_amount + $1 WHERE activity = $2 AND period_start <= $3 AND period_end >= $3',
+                    [tx.amount, tx.activity, tx.date]
+                );
+            }
+        }
+
+        const result = await db.query(
+            'UPDATE transactions SET status = $1, validated_by = $2 WHERE id = $3 RETURNING *',
+            [status, validator_id, req.params.id]
+        );
+
+        await db.query('COMMIT');
+        res.json(result.rows[0]);
+    } catch (err) {
+        await db.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    }
 });
 
 router.delete('/:id', async (req, res) => {
