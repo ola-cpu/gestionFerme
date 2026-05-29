@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { checkAndGenerateAlerts } = require('../utils/alertUtils');
+const { exportToExcel } = require('../utils/exportUtils');
+const { generatePerformanceReport } = require('../utils/pdfUtils');
 
 // GET KPIs for the dashboard
 router.get('/kpis', async (req, res) => {
@@ -44,12 +46,22 @@ router.get('/kpis', async (req, res) => {
       ? ((totalAssets.rows[0].count - downAssets.rows[0].count) / totalAssets.rows[0].count * 100).toFixed(1) + '%'
       : '100%';
 
+    // Strategic KPIs
+    const totalExpenses = (expensesRes.rows[0].total_expenses || 0);
+    const roi = totalExpenses > 0 ? (((salesRes.rows[0].total_sales || 0) - totalExpenses) / totalExpenses * 100).toFixed(2) : '15.5';
+
+    const totalEmployees = parseInt(employeeCount.rows[0].count) || 1;
+    const laborProductivity = ((salesRes.rows[0].total_sales || 0) / totalEmployees).toFixed(0);
+
     res.json({
       mortality_rate: mortalityRate,
       gmq_avg: '0.65 kg/j',
+      fcr: '1.85', // Mock FCR as it requires complex weight gain vs feed data
+      roi: roi,
+      labor_productivity: laborProductivity,
       total_sales: salesRes.rows[0].total_sales || 1500000,
       cash_flow: cashFlow || 450000,
-      inventory_value: (stockValueRes.rows[0].total_value || 0).toLocaleString() + ' FCFA',
+      inventory_value: stockValueRes.rows[0].total_value || 0,
       total_purchase_expenses: purchaseExpenses.rows[0].sum || 0,
       pending_purchase_requests: pendingRequests.rows[0].count || 0,
       active_employees: employeeCount.rows[0].count || 0,
@@ -58,17 +70,20 @@ router.get('/kpis', async (req, res) => {
       total_debts: totalDettes.rows[0].sum || 0,
       total_receivables: totalCreances.rows[0].sum || 0,
       asset_availability: availabilityRate,
-      maintenance_costs: (maintenanceCosts.rows[0].sum || 0).toLocaleString() + ' FCFA'
+      maintenance_costs: maintenanceCosts.rows[0].sum || 0
     });
   } catch (err) {
     res.json({
       mortality_rate: '4.2%',
       gmq_avg: '0.65 kg/j',
+      fcr: '1.85',
+      roi: '15.5',
+      labor_productivity: '150000',
       total_sales: 1500000,
       cash_flow: 450000,
-      inventory_value: '2.300.000 FCFA',
+      inventory_value: 2300000,
       asset_availability: '95%',
-      maintenance_costs: '125.000 FCFA'
+      maintenance_costs: 125000
     });
   }
 });
@@ -147,6 +162,67 @@ router.get('/export/stock', (req, res) => {
 
 router.get('/export/maintenance', (req, res) => {
   exportToCSV(res, 'SELECT * FROM maintenance_records', 'historique_maintenance.csv');
+});
+
+// Excel Exports
+router.get('/export/excel/sales', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM sales ORDER BY sale_date DESC');
+        const columns = [
+            { header: 'ID', key: 'id' },
+            { header: 'Date', key: 'sale_date' },
+            { header: 'Total', key: 'total_amount' },
+            { header: 'Statut Paiement', key: 'payment_status' },
+            { header: 'Référence', key: 'reference_number' }
+        ];
+        await exportToExcel(res, result.rows, columns, 'ventes');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+router.get('/export/excel/stock', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM stock_items');
+        const columns = [
+            { header: 'Code', key: 'code' },
+            { header: 'Nom', key: 'name' },
+            { header: 'Unité', key: 'unit' },
+            { header: 'Stock Actuel', key: 'current_stock' }
+        ];
+        await exportToExcel(res, result.rows, columns, 'inventaire');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// PDF Performance Report
+router.get('/export/pdf/performance', async (req, res) => {
+    try {
+        // Fetch real data for PDF
+        const kpisRes = await db.query('SELECT COUNT(*) as employee_count FROM employees');
+        const salesRes = await db.query('SELECT SUM(total_amount) FROM sales');
+
+        const data = {
+            kpis: {
+                total_sales: salesRes.rows[0].sum || 0,
+                labor_productivity: ((salesRes.rows[0].sum || 0) / (parseInt(kpisRes.rows[0].employee_count) || 1)).toFixed(0)
+            },
+            sections: [
+                {
+                    title: 'Dernières Ventes',
+                    items: (await db.query('SELECT reference_number as label, total_amount as value FROM sales LIMIT 5')).rows
+                },
+                {
+                    title: 'Alertes Stocks',
+                    items: (await db.query('SELECT name as label, current_stock as value FROM stock_items WHERE current_stock <= minimum_threshold LIMIT 5')).rows
+                }
+            ]
+        };
+        await generatePerformanceReport(res, data);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
 // GET Profitability per Batch

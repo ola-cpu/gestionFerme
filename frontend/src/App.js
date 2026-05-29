@@ -6,6 +6,7 @@ import {
   Bell, User as UserIcon, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { io } from 'socket.io-client';
 import './App.css';
 import StockList from './components/StockList';
 import WarehouseManagement from './components/WarehouseManagement';
@@ -35,6 +36,19 @@ function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      const socket = io();
+      socket.on('new_alert', (alert) => {
+        setNotifications(prev => [alert, ...prev]);
+        // Optional: show a temporary browser notification or toast
+        console.log('New system alert:', alert.message);
+      });
+      return () => socket.disconnect();
+    }
+  }, [user]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -288,9 +302,36 @@ function App() {
               )}
             </div>
 
-            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative">
+            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative group">
               <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white" />
+              {notifications.length > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white" />
+              )}
+
+              {/* Notification Dropdown */}
+              <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 hidden group-focus-within:block group-hover:block overflow-hidden">
+                <div className="p-3 border-b border-slate-100 flex justify-between items-center">
+                  <span className="font-bold text-sm">Notifications</span>
+                  <button onClick={() => setNotifications([])} className="text-[10px] text-primary-600 hover:underline">Tout marquer comme lu</button>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="p-4 text-center text-xs text-slate-400 italic">Aucune nouvelle notification</p>
+                  ) : (
+                    notifications.map((n, i) => (
+                      <div key={i} className="p-3 hover:bg-slate-50 border-b border-slate-50 last:border-0">
+                        <div className="flex gap-2">
+                          <div className="w-2 h-2 mt-1 rounded-full bg-primary-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800">{n.type}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{n.message}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </button>
 
             <div className="h-8 w-px bg-slate-200 mx-1" />

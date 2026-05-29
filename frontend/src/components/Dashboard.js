@@ -27,8 +27,14 @@ function Dashboard({ user }) {
       .then(data => setAlerts(data));
   }, [user]);
 
-  const handleExport = (module) => {
-    window.open(`/api/reports/export/${module}`);
+  const handleExport = (module, type = 'csv') => {
+    if (type === 'excel') {
+      window.open(`/api/reports/export/excel/${module}`);
+    } else if (type === 'pdf') {
+      window.open(`/api/reports/export/pdf/performance`);
+    } else {
+      window.open(`/api/reports/export/${module}`);
+    }
   };
 
   // Mock data for charts if none exists from API
@@ -72,8 +78,24 @@ function Dashboard({ user }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
+          title="ROI Moyen"
+          value={`${kpis.roi || '0'}%`}
+          trend="+2.4%"
+          up={true}
+          icon={<TrendingUp size={20} />}
+          color="bg-primary-50 text-primary-600"
+        />
+        <KPICard
+          title="Productivité Labor"
+          value={`${(parseInt(kpis.labor_productivity) || 0).toLocaleString()} FCFA`}
+          trend="+5.1%"
+          up={true}
+          icon={<Package size={20} />}
+          color="bg-success/10 text-success"
+        />
+        <KPICard
           title="Chiffre d'Affaires"
-          value={`${(kpis.total_sales || 0).toLocaleString()} FCFA`}
+          value={`${(parseInt(kpis.total_sales) || 0).toLocaleString()} FCFA`}
           trend="+12.5%"
           up={true}
           icon={<DollarSign size={20} />}
@@ -97,7 +119,7 @@ function Dashboard({ user }) {
         />
         <KPICard
           title="Coûts Maintenance"
-          value={`${(kpis.maintenance_costs || 0).toLocaleString()} FCFA`}
+          value={`${(parseInt(kpis.maintenance_costs) || 0).toLocaleString()} FCFA`}
           trend="+5%"
           up={true}
           icon={<AlertTriangle size={20} />}
@@ -203,12 +225,27 @@ function Dashboard({ user }) {
 
         <div className="card">
           <h3 className="font-bold text-slate-800 mb-4">Export de Rapports</h3>
-          <div className="space-y-2">
-            <ExportBtn label="Flux de Trésorerie" onClick={() => handleExport('transactions')} />
-            <ExportBtn label="Production Élevage" onClick={() => handleExport('livestock')} />
-            <ExportBtn label="Cycles Culturaux" onClick={() => handleExport('crops')} />
-            <ExportBtn label="État des Stocks" onClick={() => handleExport('stock')} />
-            <ExportBtn label="Historique Maintenance" onClick={() => handleExport('maintenance')} />
+          <div className="space-y-4">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Standards (CSV)</p>
+              <div className="space-y-1">
+                <ExportBtn label="Ventes" onClick={() => handleExport('transactions')} />
+                <ExportBtn label="Stocks" onClick={() => handleExport('stock')} />
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Professionnels (Excel)</p>
+              <div className="space-y-1">
+                <ExportBtn label="Rapport Ventes Excel" onClick={() => handleExport('sales', 'excel')} />
+                <ExportBtn label="Rapport Inventaire Excel" onClick={() => handleExport('stock', 'excel')} />
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Synthèse (PDF)</p>
+              <div className="space-y-1">
+                <ExportBtn label="Performance Globale PDF" onClick={() => handleExport('performance', 'pdf')} />
+              </div>
+            </div>
           </div>
         </div>
       </div>

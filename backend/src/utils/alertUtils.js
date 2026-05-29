@@ -13,13 +13,18 @@ async function checkAndGenerateAlerts() {
         `);
         for (const item of stockAlerts.rows) {
             const message = `Stock critique pour ${item.name}: ${item.current_stock} ${item.unit || ''} restant (Seuil: ${item.minimum_threshold})`;
-            await db.query(`
+            const alertResult = await db.query(`
                 INSERT INTO alerts (type, message, record_id, table_name)
                 SELECT 'Stock', $1, $2, 'stock_items'
                 WHERE NOT EXISTS (
                     SELECT 1 FROM alerts WHERE type = 'Stock' AND record_id = $2 AND status = 'Pending' AND message = $1
                 )
+                RETURNING *
             `, [message, item.id]);
+
+            if (alertResult.rows.length > 0 && global.io) {
+                global.io.emit('new_alert', alertResult.rows[0]);
+            }
         }
 
         // 2. Stock Expiry Alerts: Batch expiring in less than 30 days
