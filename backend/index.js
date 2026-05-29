@@ -1,11 +1,35 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 const db = require('./src/config/db');
 const { authenticate } = require('./src/middleware/auth');
+const { initScheduler } = require('./src/tasks/scheduler');
+
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
 const port = process.env.PORT || 3001;
 
 app.use(express.json());
+
+// WebSocket initialization
+global.io = io;
+io.on('connection', (socket) => {
+  console.log('User connected to WebSockets');
+  socket.on('disconnect', () => {
+    console.log('User disconnected');
+  });
+});
+
+// Initialize Cron Tasks
+initScheduler();
 
 // Auth Routes
 app.post('/api/auth/login', async (req, res) => {
@@ -89,6 +113,6 @@ app.get('/', (req, res) => {
   res.send('Gestock-Ferme API is running');
 });
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Backend listening at http://localhost:${port}`);
 });
