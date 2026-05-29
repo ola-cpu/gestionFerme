@@ -100,8 +100,6 @@ function LivestockList({ user, onSelectBatch }) {
     }
   };
 
-  if (loading) return <p>Chargement de l'élevage...</p>;
-
   const [showConfig, setShowConfig] = useState(false);
   const [newSpecies, setNewSpecies] = useState({
     name: '',
@@ -111,6 +109,8 @@ function LivestockList({ user, onSelectBatch }) {
     avg_weight_kg: ''
   });
   const [newBreed, setNewBreed] = useState({ species_id: '', name: '' });
+
+  if (loading) return <p>Chargement de l'élevage...</p>;
 
   const handleAddSpecies = async (e) => {
     e.preventDefault();
@@ -223,7 +223,8 @@ function LivestockList({ user, onSelectBatch }) {
                       </select>
                       <input type="text" placeholder="Nom race" value={newBreed.name} onChange={e => setNewBreed({...newBreed, name: e.target.value})} required />
                       <button type="submit">Ajouter</button>
-                  </form>
+                    </form>
+                  </div>
               </div>
           </div>
       )}
