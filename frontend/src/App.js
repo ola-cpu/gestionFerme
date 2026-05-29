@@ -243,8 +243,12 @@ function App() {
         {/* Topbar */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0">
           <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500">
-              {sidebarOpen ? <Menu size={20} /> : <Menu size={20} />}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-slate-100 rounded-lg text-slate-500"
+              aria-label={sidebarOpen ? "Réduire la barre latérale" : "Développer la barre latérale"}
+            >
+              <Menu size={20} />
             </button>
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span className="hover:text-primary-600 cursor-pointer" onClick={resetNav}>Accueil</span>
@@ -265,6 +269,7 @@ function App() {
               <input
                 type="text"
                 placeholder="Recherche globale..."
+                aria-label="Recherche globale"
                 className="bg-slate-50 border-none rounded-lg py-1.5 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary-500/20 w-64"
                 value={searchQuery}
                 onChange={(e) => {
@@ -302,7 +307,10 @@ function App() {
               )}
             </div>
 
-            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative group">
+            <button
+              className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative group"
+              aria-label="Notifications"
+            >
               <Bell size={20} />
               {notifications.length > 0 && (
                 <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white" />

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Lock, User, Loader2, Sprout } from 'lucide-react';
+import { Lock, User, Loader2, Sprout, Eye, EyeOff } from 'lucide-react';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -63,6 +64,7 @@ function Login({ onLogin }) {
                   id="username"
                   className="input w-full pl-10"
                   placeholder="votre_nom"
+                  aria-label="Nom d'utilisateur"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -79,14 +81,24 @@ function Login({ onLogin }) {
                   <Lock size={18} />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   id="password"
-                  className="input w-full pl-10"
+                  className="input w-full pl-10 pr-10"
                   placeholder="••••••••"
+                  aria-label="Mot de passe"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 
