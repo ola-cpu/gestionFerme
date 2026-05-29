@@ -5,23 +5,47 @@ function EmployeeList({ user }) {
   const [attendance, setAttendance] = useState([]);
   const [payrolls, setPayrolls] = useState([]);
   const [schedules, setSchedules] = useState([]);
-  const [view, setView] = useState('employees'); // employees, attendance, payroll, planning
+  const [contracts, setContracts] = useState([]);
+  const [leaves, setLeaves] = useState([]);
+  const [advances, setAdvances] = useState([]);
+  const [performance, setPerformance] = useState([]);
+  const [view, setView] = useState('employees'); // employees, attendance, payroll, planning, contracts, leaves, advances, performance
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const empRes = await fetch('/api/personnel', { headers: { 'X-User-ID': user?.id } });
-        setEmployees(await empRes.json());
+        const empData = await empRes.json();
+        setEmployees(Array.isArray(empData) ? empData : []);
 
         const attRes = await fetch('/api/personnel/attendance', { headers: { 'X-User-ID': user?.id } });
-        setAttendance(await attRes.json());
+        const attData = await attRes.json();
+        setAttendance(Array.isArray(attData) ? attData : []);
 
         const payRes = await fetch('/api/personnel/payrolls', { headers: { 'X-User-ID': user?.id } });
-        setPayrolls(await payRes.json());
+        const payData = await payRes.json();
+        setPayrolls(Array.isArray(payData) ? payData : []);
 
         const schRes = await fetch('/api/personnel/schedules', { headers: { 'X-User-ID': user?.id } });
-        setSchedules(await schRes.json());
+        const schData = await schRes.json();
+        setSchedules(Array.isArray(schData) ? schData : []);
+
+        const conRes = await fetch('/api/personnel/contracts', { headers: { 'X-User-ID': user?.id } });
+        const conData = await conRes.json();
+        setContracts(Array.isArray(conData) ? conData : []);
+
+        const leaRes = await fetch('/api/personnel/leaves', { headers: { 'X-User-ID': user?.id } });
+        const leaData = await leaRes.json();
+        setLeaves(Array.isArray(leaData) ? leaData : []);
+
+        const advRes = await fetch('/api/personnel/advances', { headers: { 'X-User-ID': user?.id } });
+        const advData = await advRes.json();
+        setAdvances(Array.isArray(advData) ? advData : []);
+
+        const perRes = await fetch('/api/personnel/performance', { headers: { 'X-User-ID': user?.id } });
+        const perData = await perRes.json();
+        setPerformance(Array.isArray(perData) ? perData : []);
 
         setLoading(false);
       } catch (err) {
@@ -38,11 +62,15 @@ function EmployeeList({ user }) {
     <div>
       <h2>Module Personnel & Paie</h2>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button onClick={() => setView('employees')}>Employés</button>
+        <button onClick={() => setView('contracts')}>Contrats</button>
         <button onClick={() => setView('attendance')}>Pointage</button>
+        <button onClick={() => setView('leaves')}>Congés</button>
         <button onClick={() => setView('payroll')}>Paie</button>
+        <button onClick={() => setView('advances')}>Avances</button>
         <button onClick={() => setView('planning')}>Planning</button>
+        <button onClick={() => setView('performance')}>Performance</button>
       </div>
 
       {view === 'employees' && (
@@ -63,7 +91,7 @@ function EmployeeList({ user }) {
                 <tr key={e.id}>
                   <td>{e.last_name}</td>
                   <td>{e.first_name}</td>
-                  <td>{e.position}</td>
+                  <td>{e.position_title || e.position}</td>
                   <td>{e.contract_type}</td>
                   <td>{e.base_salary?.toLocaleString()} FCFA</td>
                 </tr>
@@ -133,6 +161,88 @@ function EmployeeList({ user }) {
         </div>
       )}
 
+      {view === 'contracts' && (
+        <div>
+          <h3>Gestion des Contrats</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Employé</th>
+                <th>Type</th>
+                <th>Début</th>
+                <th>Fin</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contracts.map(c => (
+                <tr key={c.id}>
+                  <td>{c.last_name}</td>
+                  <td>{c.contract_type}</td>
+                  <td>{c.start_date}</td>
+                  <td>{c.end_date || 'N/A'}</td>
+                  <td>{c.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === 'leaves' && (
+        <div>
+          <h3>Demandes de Congés</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Employé</th>
+                <th>Type</th>
+                <th>Début</th>
+                <th>Fin</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaves.map(l => (
+                <tr key={l.id}>
+                  <td>{l.last_name}</td>
+                  <td>{l.leave_type}</td>
+                  <td>{l.start_date}</td>
+                  <td>{l.end_date}</td>
+                  <td>{l.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === 'advances' && (
+        <div>
+          <h3>Avances sur Salaire</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Employé</th>
+                <th>Montant</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {advances.map(a => (
+                <tr key={a.id}>
+                  <td>{a.request_date}</td>
+                  <td>{a.last_name}</td>
+                  <td>{a.amount?.toLocaleString()} FCFA</td>
+                  <td>{a.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {view === 'planning' && (
         <div>
           <h3>Planning des Équipes</h3>
@@ -152,6 +262,32 @@ function EmployeeList({ user }) {
                   <td>{s.last_name}</td>
                   <td>{s.shift}</td>
                   <td>{s.tasks}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === 'performance' && (
+        <div>
+          <h3>Évaluations de Performance</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Employé</th>
+                <th>Score</th>
+                <th>Appréciation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {performance.map(p => (
+                <tr key={p.id}>
+                  <td>{p.evaluation_date}</td>
+                  <td>{p.last_name}</td>
+                  <td>{p.score}/100</td>
+                  <td>{p.productivity_rating}</td>
                 </tr>
               ))}
             </tbody>
