@@ -85,6 +85,7 @@ CREATE TABLE livestock_batches (
     id SERIAL PRIMARY KEY,
     species_id INTEGER REFERENCES species(id),
     batch_name VARCHAR(100) NOT NULL,
+    qr_code VARCHAR(100) UNIQUE,
     arrival_date DATE,
     birth_date DATE,
     initial_count INTEGER,
@@ -100,6 +101,7 @@ CREATE TABLE livestock_individuals (
     mother_id INTEGER REFERENCES livestock_individuals(id),
     father_id INTEGER REFERENCES livestock_individuals(id),
     identification_code VARCHAR(50) UNIQUE,
+    qr_code VARCHAR(100) UNIQUE,
     name VARCHAR(100),
     birth_date DATE,
     gender VARCHAR(10), -- Male, Female
@@ -222,7 +224,9 @@ CREATE TABLE stock_batches (
     initial_quantity DECIMAL(10,2) NOT NULL,
     current_quantity DECIMAL(10,2) NOT NULL,
     unit_price DECIMAL(12,2), -- purchase price for valuation
-    received_date DATE DEFAULT CURRENT_DATE
+    received_date DATE DEFAULT CURRENT_DATE,
+    is_compliant BOOLEAN DEFAULT TRUE,
+    compliance_notes TEXT
 );
 
 CREATE TABLE stock_movements (
@@ -273,6 +277,7 @@ CREATE TABLE plots (
     id SERIAL PRIMARY KEY,
     farm_id INTEGER REFERENCES farms(id),
     name VARCHAR(100) NOT NULL,
+    qr_code VARCHAR(100) UNIQUE,
     area_hectares DECIMAL(10,2),
     soil_type VARCHAR(100),
     latitude DECIMAL(10, 8),
@@ -290,7 +295,8 @@ CREATE TABLE crop_types (
     cycle_duration_days INTEGER,
     water_needs TEXT,
     fertilizer_needs TEXT,
-    expected_yield_per_ha DECIMAL(10,2)
+    expected_yield_per_ha DECIMAL(10,2),
+    pre_harvest_interval_days INTEGER
 );
 
 CREATE TABLE agricultural_campaigns (
@@ -306,6 +312,7 @@ CREATE TABLE crop_cycles (
     plot_id INTEGER REFERENCES plots(id),
     campaign_id INTEGER REFERENCES agricultural_campaigns(id),
     crop_type_id INTEGER REFERENCES crop_types(id),
+    harvest_batch_id INTEGER REFERENCES stock_batches(id),
     crop_name VARCHAR(100) NOT NULL,
     season VARCHAR(50),
     planting_date DATE,
@@ -708,6 +715,7 @@ CREATE TABLE assets (
     id SERIAL PRIMARY KEY,
     farm_id INTEGER REFERENCES farms(id),
     code_actif VARCHAR(50) UNIQUE,
+    qr_code VARCHAR(100) UNIQUE,
     serial_number VARCHAR(100),
     name VARCHAR(100) NOT NULL,
     category VARCHAR(100), -- Équipement agricole, Tracteur, Véhicule, Bâtiment, etc.
@@ -795,6 +803,10 @@ CREATE TABLE audit_logs (
     action VARCHAR(100) NOT NULL,
     table_name VARCHAR(100),
     record_id INTEGER,
+    old_value TEXT,
+    new_value TEXT,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
     details TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

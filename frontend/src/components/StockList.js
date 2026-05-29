@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 function StockList({ user }) {
   const [stocks, setStocks] = useState([]);
@@ -114,7 +115,7 @@ function StockList({ user }) {
       <table>
         <thead>
           <tr>
-            <th>Article</th>
+            <th>Article / QR</th>
             <th>Catégorie</th>
             <th>Quantité</th>
             <th>Unité</th>
@@ -125,9 +126,14 @@ function StockList({ user }) {
         <tbody>
           {stocks.map(item => (
             <tr key={item.id}>
-              <td>
-                <strong>{item.name}</strong><br/>
-                <small style={{color: '#666'}}>Methode: {item.valuation_method}</small>
+              <td style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                <div>
+                   <QRCodeSVG value={item.qr_code || item.code || item.name} size={40} />
+                </div>
+                <div>
+                    <strong>{item.name}</strong><br/>
+                    <small style={{color: '#666'}}>Methode: {item.valuation_method}</small>
+                </div>
               </td>
               <td>{item.category_name}</td>
               <td>{item.current_stock}</td>

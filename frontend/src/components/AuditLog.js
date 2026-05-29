@@ -31,6 +31,9 @@ function AuditLog({ user }) {
             <th>Action</th>
             <th>Table</th>
             <th>ID Enreg.</th>
+            <th>Ancienne Valeur</th>
+            <th>Nouvelle Valeur</th>
+            <th>IP / Appareil</th>
             <th>Détails</th>
           </tr>
         </thead>
@@ -42,6 +45,12 @@ function AuditLog({ user }) {
               <td>{log.action}</td>
               <td>{log.table_name}</td>
               <td>{log.record_id}</td>
+              <td style={{fontSize: '0.8em', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis'}} title={log.old_value}>{log.old_value}</td>
+              <td style={{fontSize: '0.8em', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis'}} title={log.new_value}>{log.new_value}</td>
+              <td style={{fontSize: '0.8em'}}>
+                  <div>{log.ip_address}</div>
+                  <div style={{color: '#666', fontSize: '0.9em'}} title={log.user_agent}>{log.user_agent?.substring(0, 30)}...</div>
+              </td>
               <td>{log.details}</td>
             </tr>
           ))}
