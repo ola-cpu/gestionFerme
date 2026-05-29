@@ -9,6 +9,6 @@ test('renders Gestock-Ferme title in header', () => {
 
 test('renders Login form when not authenticated', () => {
   render(<App />);
-  const loginTitle = screen.getByText(/Connexion Gestock-Ferme/i);
+  const loginTitle = screen.getByText(/Connexion/i);
   expect(loginTitle).toBeInTheDocument();
 });

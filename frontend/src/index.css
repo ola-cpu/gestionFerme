@@ -1,13 +1,45 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans;
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2;
+  }
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 shadow-sm active:scale-95;
+  }
+  .btn-secondary {
+    @apply bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-slate-100 p-6;
+  }
+  .input {
+    @apply px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all;
+  }
+  .table-container {
+    @apply overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm;
+  }
+  .table-modern {
+    @apply w-full text-sm text-left;
+  }
+  .table-modern th {
+    @apply px-6 py-4 bg-slate-50 font-semibold text-slate-700 border-b border-slate-200;
+  }
+  .table-modern td {
+    @apply px-6 py-4 border-b border-slate-100 align-middle;
+  }
+  .table-modern tr:last-child td {
+    @apply border-b-0;
+  }
+  .table-modern tr:hover {
+    @apply bg-slate-50/50;
+  }
 }

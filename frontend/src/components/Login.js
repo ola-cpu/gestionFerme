@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Lock, User, Loader2, Sprout } from 'lucide-react';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -35,46 +36,96 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div className="login-container" style={{ maxWidth: '400px', margin: '100px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h2>Connexion Gestock-Ferme</h2>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="username">Nom d'utilisateur</label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
+    <div className="min-h-[80vh] flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-600 text-white mb-4 shadow-lg shadow-primary-200">
+            <Sprout size={32} />
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900">Gestock-Ferme</h1>
+          <p className="text-slate-500 mt-2">Gestion Intégrée de Ferme</p>
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="password">Mot de passe</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
+
+        <div className="card shadow-xl shadow-slate-200/60 border-slate-100">
+          <h2 className="text-xl font-semibold mb-6 text-slate-800">Connexion</h2>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1.5">
+                Nom d'utilisateur
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <User size={18} />
+                </div>
+                <input
+                  type="text"
+                  id="username"
+                  className="input w-full pl-10"
+                  placeholder="votre_nom"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                Mot de passe
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Lock size={18} />
+                </div>
+                <input
+                  type="password"
+                  id="password"
+                  className="input w-full pl-10"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn btn-primary w-full py-3 text-base"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Connexion...
+                </>
+              ) : (
+                'Se connecter'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Comptes de démonstration
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              {['admin', 'elevage', 'magasin', 'veto', 'vente', 'compta'].map((u) => (
+                <div key={u} className="px-2 py-1.5 bg-slate-50 rounded border border-slate-100 text-slate-600 flex justify-between">
+                  <span className="font-medium">{u}</span>
+                  <span className="text-slate-400">password</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          {loading ? 'Connexion...' : 'Se connecter'}
-        </button>
-      </form>
-      <div style={{ marginTop: '20px', fontSize: '0.8em', color: '#666' }}>
-        <p>Utilisateurs démo:</p>
-        <ul>
-          <li>admin / password</li>
-          <li>elevage / password</li>
-          <li>magasin / password</li>
-          <li>veto / password</li>
-          <li>vente / password</li>
-          <li>compta / password</li>
-        </ul>
       </div>
     </div>
   );
