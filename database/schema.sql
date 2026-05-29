@@ -226,18 +226,67 @@ CREATE TABLE plots (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     area_hectares DECIMAL(10,2),
-    soil_type VARCHAR(100)
+    soil_type VARCHAR(100),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    fertility_level VARCHAR(50),
+    water_availability VARCHAR(50),
+    responsible_id INTEGER REFERENCES users(id),
+    status VARCHAR(50) DEFAULT 'Disponible' -- Disponible, Occupé, En jachère
+);
+
+CREATE TABLE crop_types (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    variety VARCHAR(100),
+    cycle_duration_days INTEGER,
+    water_needs TEXT,
+    fertilizer_needs TEXT,
+    expected_yield_per_ha DECIMAL(10,2)
+);
+
+CREATE TABLE agricultural_campaigns (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    start_date DATE,
+    end_date DATE,
+    status VARCHAR(50) DEFAULT 'En cours' -- En cours, Terminé, Planifié
 );
 
 CREATE TABLE crop_cycles (
     id SERIAL PRIMARY KEY,
     plot_id INTEGER REFERENCES plots(id),
+    campaign_id INTEGER REFERENCES agricultural_campaigns(id),
+    crop_type_id INTEGER REFERENCES crop_types(id),
     crop_name VARCHAR(100) NOT NULL,
     season VARCHAR(50),
     planting_date DATE,
     harvest_date DATE,
     expected_yield DECIMAL(10,2),
     actual_yield DECIMAL(10,2)
+);
+
+CREATE TABLE agronomic_observations (
+    id SERIAL PRIMARY KEY,
+    crop_cycle_id INTEGER REFERENCES crop_cycles(id) ON DELETE CASCADE,
+    observation_date DATE NOT NULL,
+    growth_stage VARCHAR(100),
+    health_status VARCHAR(100),
+    pests_observations TEXT,
+    diseases_observations TEXT,
+    recommendations TEXT,
+    photo_url TEXT,
+    recorded_by INTEGER REFERENCES users(id)
+);
+
+CREATE TABLE irrigation_records (
+    id SERIAL PRIMARY KEY,
+    crop_cycle_id INTEGER REFERENCES crop_cycles(id) ON DELETE CASCADE,
+    irrigation_date DATE NOT NULL,
+    water_quantity_m3 DECIMAL(10,2),
+    duration_minutes INTEGER,
+    cost DECIMAL(12,2) DEFAULT 0,
+    method VARCHAR(50) -- Goutte-à-goutte, Aspersion, etc.
 );
 
 CREATE TABLE crop_tasks (
