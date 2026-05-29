@@ -12,12 +12,22 @@ async function authenticate(req, res, next) {
 
   try {
     const result = await db.query(
-      'SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1 AND u.is_active = TRUE',
+      'SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1 AND u.is_active = TRUE AND u.suspended_at IS NULL',
       [userId]
     );
 
     if (result.rows.length > 0) {
-      req.user = result.rows[0];
+      const user = result.rows[0];
+
+      // Fetch permissions
+      const permResult = await db.query(`
+        SELECT p.name FROM permissions p
+        JOIN role_permissions rp ON p.id = rp.permission_id
+        WHERE rp.role_id = $1
+      `, [user.role_id]);
+
+      req.user = user;
+      req.user.permissions = permResult.rows.map(r => r.name);
       req.user.ip_address = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
       req.user.user_agent = req.headers['user-agent'];
       return next();
@@ -38,20 +48,27 @@ async function authenticate(req, res, next) {
 }
 
 /**
- * Middleware to authorize based on roles.
- * @param {string[]} allowedRoles - List of role names allowed to access the route.
+ * Middleware to authorize based on roles or permissions.
+ * @param {string[]} allowed - List of role names OR permission strings (e.g., 'stock:voir') allowed.
  */
-function authorize(allowedRoles) {
+function authorize(allowed) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    if (req.user.role_name === 'Admin') {
-      return next(); // Admin has access to everything
+    // Super Admin and Admin have access to everything
+    if (req.user.role_name === 'Super Admin' || req.user.role_name === 'Admin') {
+      return next();
     }
 
-    if (allowedRoles.includes(req.user.role_name)) {
+    // Check by role name
+    if (allowed.includes(req.user.role_name)) {
+      return next();
+    }
+
+    // Check by granular permission
+    if (req.user.permissions && req.user.permissions.some(p => allowed.includes(p))) {
       return next();
     }
 
