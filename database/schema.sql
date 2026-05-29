@@ -706,22 +706,83 @@ CREATE TABLE budgets (
 
 CREATE TABLE assets (
     id SERIAL PRIMARY KEY,
+    farm_id INTEGER REFERENCES farms(id),
+    code_actif VARCHAR(50) UNIQUE,
+    serial_number VARCHAR(100),
     name VARCHAR(100) NOT NULL,
-    category VARCHAR(50), -- Équipement, Véhicule, Bâtiment
+    category VARCHAR(100), -- Équipement agricole, Tracteur, Véhicule, Bâtiment, etc.
+    brand VARCHAR(100),
+    model VARCHAR(100),
     purchase_date DATE,
     purchase_price DECIMAL(15,2),
-    status VARCHAR(50) DEFAULT 'Actif' -- Actif, En maintenance, Hors service
+    lifespan_years INTEGER,
+    status VARCHAR(50) DEFAULT 'Actif', -- Actif, En maintenance, Hors service, Réformé, Mis au rebut
+    responsible_id INTEGER REFERENCES employees(id),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    exploitation_type VARCHAR(20) DEFAULT 'Heures', -- Heures, Kilomètres, Aucun
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE maintenance_plans (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+    task_name VARCHAR(100) NOT NULL,
+    frequency_days INTEGER,
+    frequency_usage DECIMAL(10,2), -- hours or km
+    last_maintenance_date DATE,
+    last_maintenance_usage DECIMAL(10,2),
+    next_due_date DATE,
+    next_due_usage DECIMAL(10,2),
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE maintenance_interventions (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+    reporter_id INTEGER REFERENCES users(id),
+    report_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    fault_description TEXT NOT NULL,
+    urgency VARCHAR(20) DEFAULT 'Normale', -- Basse, Normale, Haute, Critique
+    status VARCHAR(50) DEFAULT 'Ouvert', -- Ouvert, En cours, Résolu, Annulé
+    assigned_technician_id INTEGER REFERENCES employees(id),
+    resolution_details TEXT,
+    resolved_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE maintenance_records (
     id SERIAL PRIMARY KEY,
     asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+    intervention_id INTEGER REFERENCES maintenance_interventions(id) ON DELETE SET NULL,
+    technician_id INTEGER REFERENCES employees(id),
     maintenance_date DATE NOT NULL,
     description TEXT,
-    task_type VARCHAR(50), -- Entretien, Réparation
-    parts_used TEXT,
-    cost DECIMAL(12,2),
-    next_due_date DATE
+    task_type VARCHAR(50), -- Préventif, Correctif
+    labor_cost DECIMAL(12,2) DEFAULT 0,
+    parts_cost DECIMAL(12,2) DEFAULT 0,
+    total_cost DECIMAL(12,2) GENERATED ALWAYS AS (labor_cost + parts_cost) STORED,
+    downtime_hours DECIMAL(10,2) DEFAULT 0,
+    next_due_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE maintenance_parts (
+    id SERIAL PRIMARY KEY,
+    maintenance_record_id INTEGER REFERENCES maintenance_records(id) ON DELETE CASCADE,
+    stock_item_id INTEGER REFERENCES stock_items(id),
+    quantity DECIMAL(10,2) NOT NULL,
+    unit_price DECIMAL(12,2) -- captured at time of use
+);
+
+CREATE TABLE asset_usage_logs (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+    record_date DATE DEFAULT CURRENT_DATE,
+    usage_value DECIMAL(10,2) NOT NULL, -- Cumulative hours or km
+    fuel_liters DECIMAL(10,2) DEFAULT 0,
+    operator_id INTEGER REFERENCES employees(id),
+    notes TEXT
 );
 
 -- ==========================================

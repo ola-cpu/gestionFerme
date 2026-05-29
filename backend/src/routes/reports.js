@@ -34,6 +34,15 @@ router.get('/kpis', async (req, res) => {
     // Inventory Value
     const stockValueRes = await db.query('SELECT SUM(current_quantity * unit_price) as total_value FROM stock_batches');
 
+    // Maintenance KPIs
+    const totalAssets = await db.query('SELECT COUNT(*) FROM assets');
+    const downAssets = await db.query('SELECT COUNT(*) FROM assets WHERE status IN (\'En maintenance\', \'Hors service\')');
+    const maintenanceCosts = await db.query('SELECT SUM(total_cost) FROM maintenance_records');
+
+    const availabilityRate = totalAssets.rows[0].count > 0
+      ? ((totalAssets.rows[0].count - downAssets.rows[0].count) / totalAssets.rows[0].count * 100).toFixed(1) + '%'
+      : '100%';
+
     res.json({
       mortality_rate: mortalityRate,
       gmq_avg: '0.65 kg/j',
@@ -46,7 +55,9 @@ router.get('/kpis', async (req, res) => {
       employees_on_leave: leaveCount.rows[0].count || 0,
       total_bank_balance: bankBalance.rows[0].sum || 0,
       total_debts: totalDettes.rows[0].sum || 0,
-      total_receivables: totalCreances.rows[0].sum || 0
+      total_receivables: totalCreances.rows[0].sum || 0,
+      asset_availability: availabilityRate,
+      maintenance_costs: (maintenanceCosts.rows[0].sum || 0).toLocaleString() + ' FCFA'
     });
   } catch (err) {
     res.json({
@@ -54,7 +65,9 @@ router.get('/kpis', async (req, res) => {
       gmq_avg: '0.65 kg/j',
       total_sales: 1500000,
       cash_flow: 450000,
-      inventory_value: '2.300.000 FCFA'
+      inventory_value: '2.300.000 FCFA',
+      asset_availability: '95%',
+      maintenance_costs: '125.000 FCFA'
     });
   }
 });
@@ -64,43 +77,69 @@ router.get('/alerts', async (req, res) => {
   try {
     const stockAlerts = await db.query('SELECT name, current_stock, minimum_threshold FROM stock_items WHERE current_stock <= minimum_threshold');
     const expiryAlerts = await db.query('SELECT batch_number, expiry_date FROM stock_batches WHERE expiry_date <= CURRENT_DATE + INTERVAL \'30 days\'');
+    const maintenanceAlerts = await db.query('SELECT a.name, p.task_name, p.next_due_date FROM maintenance_plans p JOIN assets a ON p.asset_id = a.id WHERE p.next_due_date <= CURRENT_DATE + INTERVAL \'7 days\' AND p.is_active = TRUE');
 
     res.json({
       stock: stockAlerts.rows,
       expiry: expiryAlerts.rows,
+      maintenance: maintenanceAlerts.rows,
       unpaid_sales: 2 // Mock count
     });
   } catch (err) {
     res.json({
       stock: [{ name: 'Aliment Volaille', current_stock: 50, minimum_threshold: 100 }],
       expiry: [{ batch_number: 'LOT-2024-001', expiry_date: '2024-03-15' }],
+      maintenance: [{ name: 'Tracteur John Deere', task_name: 'Vidange moteur', next_due_date: '2024-04-20' }],
       unpaid_sales: 3
     });
   }
 });
 
-// Export transactions to CSV
-router.get('/export/transactions', async (req, res) => {
-    try {
-        const result = await db.query('SELECT * FROM transactions ORDER BY date DESC');
-        const rows = result.rows;
+// Helper for CSV export
+const exportToCSV = async (res, query, filename, params = []) => {
+  try {
+    const result = await db.query(query, params);
+    const rows = result.rows;
 
-        if (rows.length === 0) {
-            return res.status(404).send('No transactions to export');
-        }
-
-        const header = Object.keys(rows[0]).join(',');
-        const csv = [
-            header,
-            ...rows.map(row => Object.values(row).map(v => `"${v}"`).join(','))
-        ].join('\n');
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', 'attachment; filename=transactions.csv');
-        res.send(csv);
-    } catch (err) {
-        res.status(500).send(err.message);
+    if (rows.length === 0) {
+      return res.status(404).send('No data to export');
     }
+
+    const header = Object.keys(rows[0]).join(',');
+    const csv = [
+      header,
+      ...rows.map(row => Object.values(row).map(v => {
+        if (v === null || v === undefined) return '""';
+        return `"${String(v).replace(/"/g, '""')}"`;
+      }).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(csv);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+};
+
+router.get('/export/transactions', (req, res) => {
+  exportToCSV(res, 'SELECT * FROM transactions ORDER BY date DESC', 'transactions.csv');
+});
+
+router.get('/export/livestock', (req, res) => {
+  exportToCSV(res, 'SELECT * FROM livestock_individuals', 'elevage_individus.csv');
+});
+
+router.get('/export/crops', (req, res) => {
+  exportToCSV(res, 'SELECT * FROM crop_cycles', 'cycles_culturaux.csv');
+});
+
+router.get('/export/stock', (req, res) => {
+  exportToCSV(res, 'SELECT * FROM stock_items', 'inventaire_stock.csv');
+});
+
+router.get('/export/maintenance', (req, res) => {
+  exportToCSV(res, 'SELECT * FROM maintenance_records', 'historique_maintenance.csv');
 });
 
 // GET Traceability report for a batch
