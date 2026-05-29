@@ -41,51 +41,83 @@ function PurchaseList({ user }) {
       </div>
 
       {view === 'purchases' ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Fournisseur</th>
-              <th>Date</th>
-              <th>Montant</th>
-              <th>Qualité</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {purchases.map(p => (
-              <tr key={p.id}>
-                <td>{p.supplier_name}</td>
-                <td>{p.purchase_date}</td>
-                <td>{p.total_amount?.toLocaleString()} FCFA</td>
-                <td><span style={{color: 'green'}}>Conforme</span></td>
-                <td>{p.status}</td>
+        <div>
+          <div style={{marginBottom: '10px'}}>
+            <button onClick={() => alert('Nouvelle Commande')}>+ Nouvelle Commande</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fournisseur</th>
+                <th>Date</th>
+                <th>Montant</th>
+                <th>Statut</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {purchases.map(p => (
+                <tr key={p.id}>
+                  <td>#{p.id}</td>
+                  <td>{p.supplier_name}</td>
+                  <td>{p.purchase_date}</td>
+                  <td>{p.total_amount?.toLocaleString()} FCFA</td>
+                  <td>
+                    <span style={{
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      backgroundColor: p.status === 'Received' ? '#d4edda' : '#fff3cd'
+                    }}>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td>
+                    {p.status === 'Ordered' && <button onClick={() => alert('Enregistrer Réception')}>Réceptionner</button>}
+                    <button>Détails</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Description</th>
-              <th>Statut</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.map(r => (
-              <tr key={r.id}>
-                <td>{r.request_date}</td>
-                <td>{r.description}</td>
-                <td>{r.status}</td>
-                <td>
-                  <button size="small">Valider</button>
-                </td>
+        <div>
+          <div style={{marginBottom: '10px'}}>
+            <button onClick={() => alert('Nouvelle Demande')}>+ Nouvelle Demande d'Achat</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Département</th>
+                <th>Urgence</th>
+                <th>Description</th>
+                <th>Statut</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {requests.map(r => (
+                <tr key={r.id}>
+                  <td>{r.request_date}</td>
+                  <td>{r.department || 'Général'}</td>
+                  <td>
+                    <span style={{color: r.urgency === 'Critique' ? 'red' : 'inherit'}}>
+                      {r.urgency || 'Normale'}
+                    </span>
+                  </td>
+                  <td>{r.description}</td>
+                  <td>{r.status}</td>
+                  <td>
+                    {r.status === 'Soumis' && <button size="small">Valider</button>}
+                    <button size="small">Détails</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

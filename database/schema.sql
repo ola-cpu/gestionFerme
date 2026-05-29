@@ -352,16 +352,26 @@ CREATE TABLE crop_inputs (
 CREATE TABLE suppliers (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    category VARCHAR(50), -- Local, International, Grossiste, Producteur
+    is_international BOOLEAN DEFAULT FALSE,
     contact_name VARCHAR(100),
-    phone VARCHAR(20)
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    address TEXT,
+    delivery_lead_time_days INTEGER,
+    payment_conditions TEXT
 );
 
 CREATE TABLE purchase_requests (
     id SERIAL PRIMARY KEY,
     requester_id INTEGER REFERENCES users(id),
+    department VARCHAR(50), -- Élevage, Agriculture, Production, Maintenance, Administration
     request_date DATE DEFAULT CURRENT_DATE,
     description TEXT,
-    status VARCHAR(50) DEFAULT 'Pending', -- Pending, Approved, Rejected, Ordered
+    urgency VARCHAR(20) DEFAULT 'Normale', -- Basse, Normale, Haute, Critique
+    justification TEXT,
+    estimated_budget DECIMAL(15,2),
+    status VARCHAR(50) DEFAULT 'Brouillon', -- Brouillon, Soumis, Validé, Rejeté, Commandé, Réceptionné
     validation_date DATE,
     validator_id INTEGER REFERENCES users(id)
 );
@@ -380,12 +390,35 @@ CREATE TABLE purchase_items (
     purchase_id INTEGER REFERENCES purchases(id) ON DELETE CASCADE,
     stock_item_id INTEGER REFERENCES stock_items(id),
     quantity DECIMAL(10,2) NOT NULL,
+    received_quantity DECIMAL(10,2) DEFAULT 0,
     unit_price DECIMAL(12,2) NOT NULL,
     total_price DECIMAL(15,2) NOT NULL
 );
 
+CREATE TABLE purchase_receptions (
+    id SERIAL PRIMARY KEY,
+    purchase_id INTEGER REFERENCES purchases(id) ON DELETE CASCADE,
+    reception_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    received_by INTEGER REFERENCES users(id),
+    delivery_note_ref VARCHAR(100),
+    notes TEXT
+);
+
+CREATE TABLE purchase_reception_items (
+    id SERIAL PRIMARY KEY,
+    reception_id INTEGER REFERENCES purchase_receptions(id) ON DELETE CASCADE,
+    purchase_item_id INTEGER REFERENCES purchase_items(id),
+    stock_item_id INTEGER REFERENCES stock_items(id),
+    batch_id INTEGER REFERENCES stock_batches(id),
+    quantity_received DECIMAL(10,2) NOT NULL,
+    quantity_rejected DECIMAL(10,2) DEFAULT 0,
+    expiry_date DATE, -- For lot creation
+    lot_number VARCHAR(50)
+);
+
 CREATE TABLE quality_controls (
     id SERIAL PRIMARY KEY,
+    reception_id INTEGER REFERENCES purchase_receptions(id) ON DELETE CASCADE,
     purchase_id INTEGER REFERENCES purchases(id) ON DELETE CASCADE,
     check_date DATE DEFAULT CURRENT_DATE,
     is_conform BOOLEAN DEFAULT TRUE,
@@ -412,7 +445,10 @@ CREATE TABLE clients (
     type VARCHAR(50), -- Wholesaler, Retailer, Restaurateur, Market
     phone VARCHAR(20),
     email VARCHAR(100),
-    address TEXT
+    address TEXT,
+    credit_limit DECIMAL(15,2) DEFAULT 0,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8)
 );
 
 CREATE TABLE sales (
@@ -420,10 +456,25 @@ CREATE TABLE sales (
     client_id INTEGER REFERENCES clients(id),
     sale_date DATE NOT NULL,
     total_amount DECIMAL(15,2),
+    tax_amount DECIMAL(15,2) DEFAULT 0,
+    discount_amount DECIMAL(15,2) DEFAULT 0,
     payment_status VARCHAR(50), -- Pending, Paid, Partial
     document_type VARCHAR(50), -- Devis, Bon de commande, Facture
     reference_number VARCHAR(50) UNIQUE,
-    delivery_status VARCHAR(50) -- Pending, Shipped, Delivered
+    delivery_status VARCHAR(50) DEFAULT 'Pending', -- Pending, Shipped, Delivered
+    valid_until DATE -- For Devis
+);
+
+CREATE TABLE deliveries (
+    id SERIAL PRIMARY KEY,
+    sale_id INTEGER REFERENCES sales(id) ON DELETE CASCADE,
+    delivery_date TIMESTAMP WITH TIME ZONE,
+    driver_name VARCHAR(100),
+    vehicle_plate VARCHAR(20),
+    status VARCHAR(50) DEFAULT 'Pending', -- Pending, In Transit, Delivered, Cancelled
+    tracking_number VARCHAR(100),
+    signature_url TEXT,
+    notes TEXT
 );
 
 CREATE TABLE sale_items (
