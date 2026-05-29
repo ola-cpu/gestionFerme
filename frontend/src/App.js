@@ -23,6 +23,7 @@ import MaintenanceModule from './components/MaintenanceModule';
 import Dashboard from './components/Dashboard';
 import AuditLog from './components/AuditLog';
 import TraceabilityReport from './components/TraceabilityReport';
+import UserManagement from './components/UserManagement';
 import Login from './components/Login';
 
 function App() {
@@ -63,11 +64,12 @@ function App() {
     { id: 'personnel', name: 'Personnel', icon: <Users size={20} />, roles: ['RH/Comptable'] },
     { id: 'tresorerie', name: 'Trésorerie', icon: <Landmark size={20} />, roles: ['RH/Comptable'] },
     { id: 'maintenance', name: 'Maintenance', icon: <Wrench size={20} />, roles: ['Chef d’élevage', 'Magasinier'] },
-    { id: 'audit', name: 'Audit', icon: <History size={20} />, roles: ['Admin'] },
-    { id: 'traceabilite', name: 'Traçabilité', icon: <Search size={20} />, roles: ['Admin', 'Commercial', 'Chef d’élevage'] }
+    { id: 'audit', name: 'Audit', icon: <History size={20} />, roles: ['Admin', 'Super Admin'] },
+    { id: 'users', name: 'Utilisateurs', icon: <Users size={20} />, roles: ['Admin', 'Super Admin'] },
+    { id: 'traceabilite', name: 'Traçabilité', icon: <Search size={20} />, roles: ['Admin', 'Super Admin', 'Commercial', 'Chef d’élevage'] }
   ];
 
-  const authorizedModules = user?.role === 'Admin'
+  const authorizedModules = (user?.role === 'Admin' || user?.role === 'Super Admin')
     ? modules
     : modules.filter(m => m.roles.includes(user?.role));
 
@@ -102,6 +104,7 @@ function App() {
         case 'maintenance': content = <MaintenanceModule user={user} />; break;
         case 'dashboard': content = <Dashboard user={user} />; break;
         case 'audit': content = <AuditLog user={user} />; break;
+        case 'users': content = <UserManagement user={user} />; break;
         case 'traceabilite': content = <TraceabilityReport user={user} />; break;
         default:
           content = (
