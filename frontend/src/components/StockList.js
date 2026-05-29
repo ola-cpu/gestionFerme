@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import {
+  Package, Plus, Search, Filter, Warehouse,
+  Trash2, BarChart3, History, ClipboardList,
+  AlertTriangle, CheckCircle2, MoreVertical, X
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function StockList({ user }) {
   const [stocks, setStocks] = useState([]);
@@ -7,6 +13,7 @@ function StockList({ user }) {
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [newItem, setNewItem] = useState({
     name: '', category_id: 1, unit: 'kg', current_stock: 0,
     minimum_threshold: 10, maximum_threshold: 1000,
@@ -16,7 +23,7 @@ function StockList({ user }) {
   useEffect(() => {
     fetchStocks();
     fetchWarehouses();
-  }, [selectedWarehouse]);
+  }, [selectedWarehouse, user]);
 
   const fetchWarehouses = async () => {
     try {
@@ -34,10 +41,7 @@ function StockList({ user }) {
       setStocks(data);
       setLoading(false);
     } catch (err) {
-      console.error("Fetch error, using mock data", err);
-      setStocks([
-        { id: 1, name: 'Maïs Concassé', category_id: 1, unit: 'kg', current_stock: 500, minimum_threshold: 100 }
-      ]);
+      console.error("Fetch error", err);
       setLoading(false);
     }
   };
@@ -71,98 +75,182 @@ function StockList({ user }) {
     }
   };
 
-  if (loading) return <p>Chargement des stocks...</p>;
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    </div>
+  );
 
   return (
-    <div className="stock-list">
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-        <h2>État des Stocks</h2>
-        <button onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Annuler' : 'Ajouter un article'}
-        </button>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">État des Stocks</h2>
+          <p className="text-slate-500 text-sm">Vue d'ensemble de l'inventaire et des alertes</p>
+        </div>
+        <div className="flex gap-2">
+          <button className="btn btn-secondary text-sm">
+            <ClipboardList size={18} /> Inventaire
+          </button>
+          <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
+            {showForm ? <X size={18} /> : <Plus size={18} />}
+            {showForm ? 'Annuler' : 'Ajouter un article'}
+          </button>
+        </div>
       </div>
 
-      <div style={{ marginBottom: '15px' }}>
-        <select value={selectedWarehouse} onChange={e => setSelectedWarehouse(e.target.value)}>
-          <option value="">Tous les magasins</option>
-          {warehouses.map(w => (
-            <option key={w.id} value={w.id}>{w.name}</option>
-          ))}
-        </select>
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <Warehouse size={20} className="text-slate-400" />
+          <select
+            value={selectedWarehouse}
+            onChange={e => setSelectedWarehouse(e.target.value)}
+            className="input py-1.5 text-sm w-full md:w-64"
+          >
+            <option value="">Tous les magasins</option>
+            {warehouses.map(w => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            placeholder="Rechercher un article..."
+            className="input w-full pl-10 py-1.5 text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleAdd} className="module-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <input type="text" placeholder="Code Article" value={newItem.code} onChange={e => setNewItem({...newItem, code: e.target.value})} />
-          <input type="text" placeholder="Nom de l'article" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} required />
-          <input type="text" placeholder="QR Code" value={newItem.qr_code} onChange={e => setNewItem({...newItem, qr_code: e.target.value})} />
-          <select value={newItem.category_id} onChange={e => setNewItem({...newItem, category_id: e.target.value})}>
-             <option value="1">Aliments</option>
-             <option value="2">Médicaments</option>
-          </select>
-          <input type="number" placeholder="Quantité Initiale" value={newItem.current_stock} onChange={e => setNewItem({...newItem, current_stock: e.target.value})} required />
-          <input type="text" placeholder="Unité (kg, L...)" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} required />
-          <input type="number" placeholder="Seuil Min" value={newItem.minimum_threshold} onChange={e => setNewItem({...newItem, minimum_threshold: e.target.value})} required />
-          <input type="number" placeholder="Seuil Max" value={newItem.maximum_threshold} onChange={e => setNewItem({...newItem, maximum_threshold: e.target.value})} />
-          <select value={newItem.valuation_method} onChange={e => setNewItem({...newItem, valuation_method: e.target.value})}>
-             <option value="CMUP">CMUP</option>
-             <option value="FIFO">FIFO</option>
-          </select>
-          <button type="submit" style={{ gridColumn: 'span 2' }}>Enregistrer</button>
-        </form>
-      )}
-
-      <table>
-        <thead>
-          <tr>
-            <th>Article / QR</th>
-            <th>Catégorie</th>
-            <th>Quantité</th>
-            <th>Unité</th>
-            <th>Status / Alertes</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stocks.map(item => (
-            <tr key={item.id}>
-              <td style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                <div>
-                   <QRCodeSVG value={item.qr_code || item.code || item.name} size={40} />
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="card p-0 overflow-hidden bg-slate-50/50"
+          >
+            <form onSubmit={handleAdd} className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Code & Nom</label>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Code" value={newItem.code} onChange={e => setNewItem({...newItem, code: e.target.value})} className="input w-24 text-sm" />
+                  <input type="text" placeholder="Désignation" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} required className="input flex-1 text-sm" />
                 </div>
-                <div>
-                    <strong>{item.name}</strong><br/>
-                    <small style={{color: '#666'}}>Methode: {item.valuation_method}</small>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Catégorie & Unité</label>
+                <div className="flex gap-2">
+                  <select value={newItem.category_id} onChange={e => setNewItem({...newItem, category_id: e.target.value})} className="input flex-1 text-sm">
+                    <option value="1">Aliments</option>
+                    <option value="2">Médicaments</option>
+                  </select>
+                  <input type="text" placeholder="Unité" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} required className="input w-20 text-sm" />
                 </div>
-              </td>
-              <td>{item.category_name}</td>
-              <td>{item.current_stock}</td>
-              <td>{item.unit}</td>
-              <td>
-                {item.current_stock <= item.minimum_threshold &&
-                  <div style={{color: 'red', fontWeight: 'bold'}}>⚠️ Seuil Critique</div>
-                }
-                {item.near_expiry_count > 0 &&
-                  <div style={{color: 'orange'}}>📅 {item.near_expiry_count} lot(s) proche expiration</div>
-                }
-                {item.current_stock > item.minimum_threshold && item.near_expiry_count === 0 &&
-                  <span style={{color: 'green'}}>Correct</span>
-                }
-              </td>
-              <td>
-                <button onClick={() => {}} title="Détails/Lots">Lots</button>
-                <button onClick={() => {}} title="Mouvements">Mvts</button>
-                <button onClick={() => handleDelete(item.id)} style={{color: 'red'}}>Suppr.</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Quantité & Seuils</label>
+                <div className="flex gap-2">
+                  <input type="number" placeholder="Init." value={newItem.current_stock} onChange={e => setNewItem({...newItem, current_stock: e.target.value})} required className="input flex-1 text-sm" />
+                  <input type="number" placeholder="Min" value={newItem.minimum_threshold} onChange={e => setNewItem({...newItem, minimum_threshold: e.target.value})} required className="input flex-1 text-sm" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <select value={newItem.valuation_method} onChange={e => setNewItem({...newItem, valuation_method: e.target.value})} className="input flex-1 text-sm">
+                  <option value="CMUP">CMUP</option>
+                  <option value="FIFO">FIFO</option>
+                </select>
+                <button type="submit" className="btn btn-primary px-6">Ajouter</button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div style={{marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px'}}>
-        <h3>Inventaire Périodique</h3>
-        <p>Enregistrer les écarts constatés lors du comptage physique.</p>
-        <button disabled>Démarrer un inventaire</button>
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
+              <tr>
+                <th>Article / Identification</th>
+                <th>Catégorie</th>
+                <th>Stock Actuel</th>
+                <th>Unité</th>
+                <th>Statut</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stocks.filter(item =>
+                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.code?.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map(item => (
+                <tr key={item.id}>
+                  <td>
+                    <div className="flex items-center gap-4">
+                      <div className="p-1 bg-white border border-slate-100 rounded shadow-sm">
+                        <QRCodeSVG value={item.qr_code || item.code || item.name} size={32} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{item.name}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-medium">{item.code || 'SANS CODE'} • {item.valuation_method}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                      {item.category_name}
+                    </span>
+                  </td>
+                  <td className="font-bold text-slate-900">{item.current_stock?.toLocaleString()}</td>
+                  <td className="text-slate-500">{item.unit}</td>
+                  <td>
+                    <div className="space-y-1">
+                      {item.current_stock <= item.minimum_threshold ? (
+                        <div className="flex items-center gap-1.5 text-danger font-bold text-xs">
+                          <AlertTriangle size={14} /> Seuil Critique
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-success font-medium text-xs">
+                          <CheckCircle2 size={14} /> Correct
+                        </div>
+                      )}
+                      {item.near_expiry_count > 0 && (
+                        <div className="flex items-center gap-1.5 text-warning font-medium text-[10px]">
+                          <AlertTriangle size={12} /> {item.near_expiry_count} lot(s) exp.
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <button className="p-1.5 hover:bg-slate-100 text-slate-400 rounded transition-colors" title="Détails/Lots">
+                        <BarChart3 size={16} />
+                      </button>
+                      <button className="p-1.5 hover:bg-slate-100 text-slate-400 rounded transition-colors" title="Historique">
+                        <History size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1.5 hover:bg-danger/10 text-slate-400 hover:text-danger rounded transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {stocks.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="text-center py-12 text-slate-400 italic">Aucun article en stock</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
