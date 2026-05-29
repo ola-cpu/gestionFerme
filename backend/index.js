@@ -59,6 +59,7 @@ app.use(authenticate);
 // Routes
 const livestockRoutes = require('./src/routes/livestock');
 const stockRoutes = require('./src/routes/stocks');
+const warehouseRoutes = require('./src/routes/warehouses');
 const cropRoutes = require('./src/routes/crops');
 const purchaseRoutes = require('./src/routes/purchases');
 const saleRoutes = require('./src/routes/sales');
@@ -71,6 +72,7 @@ const auditRoutes = require('./src/routes/audit');
 
 app.use('/api/livestock', livestockRoutes);
 app.use('/api/stocks', stockRoutes);
+app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/crops', cropRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/sales', saleRoutes);

@@ -2,17 +2,33 @@ import React, { useState, useEffect } from 'react';
 
 function StockList({ user }) {
   const [stocks, setStocks] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', category_id: 1, unit: 'kg', current_stock: 0, minimum_threshold: 10 });
+  const [newItem, setNewItem] = useState({
+    name: '', category_id: 1, unit: 'kg', current_stock: 0,
+    minimum_threshold: 10, maximum_threshold: 1000,
+    code: '', qr_code: '', valuation_method: 'CMUP'
+  });
 
   useEffect(() => {
     fetchStocks();
-  }, []);
+    fetchWarehouses();
+  }, [selectedWarehouse]);
+
+  const fetchWarehouses = async () => {
+    try {
+      const response = await fetch('/api/warehouses', { headers: { 'X-User-ID': user?.id } });
+      const data = await response.json();
+      setWarehouses(data);
+    } catch (err) { console.error(err); }
+  };
 
   const fetchStocks = async () => {
     try {
-      const response = await fetch('/api/stocks', { headers: { 'X-User-ID': user?.id } });
+      const url = selectedWarehouse ? `/api/stocks?warehouse_id=${selectedWarehouse}` : '/api/stocks';
+      const response = await fetch(url, { headers: { 'X-User-ID': user?.id } });
       const data = await response.json();
       setStocks(data);
       setLoading(false);
@@ -65,13 +81,33 @@ function StockList({ user }) {
         </button>
       </div>
 
+      <div style={{ marginBottom: '15px' }}>
+        <select value={selectedWarehouse} onChange={e => setSelectedWarehouse(e.target.value)}>
+          <option value="">Tous les magasins</option>
+          {warehouses.map(w => (
+            <option key={w.id} value={w.id}>{w.name}</option>
+          ))}
+        </select>
+      </div>
+
       {showForm && (
-        <form onSubmit={handleAdd} className="module-form">
+        <form onSubmit={handleAdd} className="module-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <input type="text" placeholder="Code Article" value={newItem.code} onChange={e => setNewItem({...newItem, code: e.target.value})} />
           <input type="text" placeholder="Nom de l'article" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} required />
-          <input type="number" placeholder="Quantité" value={newItem.current_stock} onChange={e => setNewItem({...newItem, current_stock: e.target.value})} required />
+          <input type="text" placeholder="QR Code" value={newItem.qr_code} onChange={e => setNewItem({...newItem, qr_code: e.target.value})} />
+          <select value={newItem.category_id} onChange={e => setNewItem({...newItem, category_id: e.target.value})}>
+             <option value="1">Aliments</option>
+             <option value="2">Médicaments</option>
+          </select>
+          <input type="number" placeholder="Quantité Initiale" value={newItem.current_stock} onChange={e => setNewItem({...newItem, current_stock: e.target.value})} required />
           <input type="text" placeholder="Unité (kg, L...)" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} required />
-          <input type="number" placeholder="Seuil alerte" value={newItem.minimum_threshold} onChange={e => setNewItem({...newItem, minimum_threshold: e.target.value})} required />
-          <button type="submit">Enregistrer</button>
+          <input type="number" placeholder="Seuil Min" value={newItem.minimum_threshold} onChange={e => setNewItem({...newItem, minimum_threshold: e.target.value})} required />
+          <input type="number" placeholder="Seuil Max" value={newItem.maximum_threshold} onChange={e => setNewItem({...newItem, maximum_threshold: e.target.value})} />
+          <select value={newItem.valuation_method} onChange={e => setNewItem({...newItem, valuation_method: e.target.value})}>
+             <option value="CMUP">CMUP</option>
+             <option value="FIFO">FIFO</option>
+          </select>
+          <button type="submit" style={{ gridColumn: 'span 2' }}>Enregistrer</button>
         </form>
       )}
 

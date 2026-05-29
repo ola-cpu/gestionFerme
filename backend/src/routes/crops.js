@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { deductStockFIFO } = require('../utils/stockUtils');
 
 // --- PLOTS ---
 
@@ -198,22 +199,24 @@ router.get('/tasks/:taskId/inputs', async (req, res) => {
   });
 
 router.post('/inputs', async (req, res) => {
-    const { crop_task_id, stock_item_id, quantity, unit, cost } = req.body;
+    const { crop_task_id, stock_item_id, quantity, unit, cost, warehouse_id } = req.body;
+    const user_id = req.user.id;
     try {
-      // 1. Check stock and decrease it
-      const stockCheck = await db.query('SELECT current_stock FROM stock_items WHERE id = $1', [stock_item_id]);
-      if (stockCheck.rows.length === 0) return res.status(404).json({ error: 'Stock item not found' });
-      if (stockCheck.rows[0].current_stock < quantity) return res.status(400).json({ error: 'Insufficient stock' });
+      await db.query('BEGIN');
 
-      await db.query('UPDATE stock_items SET current_stock = current_stock - $1 WHERE id = $2', [quantity, stock_item_id]);
+      // 1. Check stock and decrease it using FIFO logic
+      await deductStockFIFO(stock_item_id, warehouse_id, quantity, `Utilisation culture - tâche #${crop_task_id}`, user_id);
 
       // 2. Insert input record
       const result = await db.query(
         'INSERT INTO crop_inputs (crop_task_id, stock_item_id, quantity, unit, cost) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [crop_task_id, stock_item_id, quantity, unit, cost]
       );
+
+      await db.query('COMMIT');
       res.status(201).json(result.rows[0]);
     } catch (err) {
+      await db.query('ROLLBACK');
       res.status(500).json({ error: err.message });
     }
   });
