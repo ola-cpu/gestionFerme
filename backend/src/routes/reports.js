@@ -205,7 +205,13 @@ router.get('/traceability/batch/:id', async (req, res) => {
         const health = await db.query('SELECT * FROM health_records WHERE batch_id = $1 ORDER BY record_date ASC', [batchId]);
         const feeding = await db.query('SELECT * FROM feeding_records WHERE batch_id = $1 ORDER BY record_date ASC', [batchId]);
         const slaughter = await db.query('SELECT * FROM slaughter_records WHERE batch_id = $1 ORDER BY slaughter_date ASC', [batchId]);
-        const sales = await db.query('SELECT s.*, si.quantity, si.unit_price FROM sales s JOIN sale_items si ON s.id = si.sale_id WHERE si.batch_id = $1', [batchId]);
+        const sales = await db.query(`
+            SELECT s.*, c.name as client_name, si.quantity, si.unit_price
+            FROM sales s
+            JOIN sale_items si ON s.id = si.sale_id
+            LEFT JOIN clients c ON s.client_id = c.id
+            WHERE si.batch_id = $1
+        `, [batchId]);
 
         // Add reception info for inputs if relevant (simplified for batch)
         const receptions = await db.query('SELECT pr.*, s.name as supplier_name FROM purchase_receptions pr JOIN purchases p ON pr.purchase_id = p.id JOIN suppliers s ON p.supplier_id = s.id WHERE p.id IN (SELECT purchase_id FROM purchase_items WHERE stock_item_id IN (SELECT stock_item_id FROM crop_inputs WHERE crop_task_id IN (SELECT id FROM crop_tasks WHERE crop_cycle_id IN (SELECT id FROM crop_cycles WHERE crop_name = (SELECT batch_name FROM livestock_batches WHERE id = $1)))))', [batchId]);
@@ -220,6 +226,29 @@ router.get('/traceability/batch/:id', async (req, res) => {
                 receptions: receptions.rows
             }
         });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Global Search
+router.get('/search', async (req, res) => {
+    const { q } = req.query;
+    if (!q) return res.json([]);
+    const term = `%${q}%`;
+
+    try {
+        const livestock = await db.query('SELECT id, identification_code as title, name as subtitle, \'Livestock\' as type FROM livestock_individuals WHERE identification_code ILIKE $1 OR name ILIKE $1 LIMIT 5', [term]);
+        const crops = await db.query('SELECT id, crop_name as title, season as subtitle, \'Crop\' as type FROM crop_cycles WHERE crop_name ILIKE $1 LIMIT 5', [term]);
+        const stocks = await db.query('SELECT id, name as title, code as subtitle, \'Stock\' as type FROM stock_items WHERE name ILIKE $1 OR code ILIKE $1 LIMIT 5', [term]);
+        const clients = await db.query('SELECT id, name as title, type as subtitle, \'Client\' as type FROM clients WHERE name ILIKE $1 LIMIT 5', [term]);
+
+        res.json([
+            ...livestock.rows,
+            ...crops.rows,
+            ...stocks.rows,
+            ...clients.rows
+        ]);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

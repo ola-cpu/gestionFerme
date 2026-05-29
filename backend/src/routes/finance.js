@@ -36,6 +36,7 @@ router.get('/', async (req, res) => {
       SELECT t.*, b.account_name
       FROM transactions t
       LEFT JOIN bank_accounts b ON t.bank_account_id = b.id
+      WHERE t.deleted_at IS NULL
       ORDER BY t.date DESC
     `);
     res.json(result.rows);
@@ -113,8 +114,8 @@ router.put('/:id/validate', authorize(['RH/Comptable', 'Admin']), async (req, re
         }
 
         const result = await db.query(
-            'UPDATE transactions SET status = $1, validated_by = $2 WHERE id = $3 RETURNING *',
-            [status, validator_id, req.params.id]
+            'UPDATE transactions SET status = $1, validated_by = $2, is_validated = $4, validation_date = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+            [status, validator_id, req.params.id, status === 'Validé']
         );
 
         await db.query('COMMIT');
@@ -135,25 +136,27 @@ router.delete('/:id', async (req, res) => {
     if (txRes.rows.length > 0) {
         const tx = txRes.rows[0];
 
-        // Reverse balance update
-        const balanceChange = (tx.type === 'ENTRÉE' ? -tx.amount : tx.amount);
-        if (tx.bank_account_id) {
-            await db.query(
-                'UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2',
-                [balanceChange, tx.bank_account_id]
-            );
-        }
+        if (tx.status === 'Validé') {
+            // Reverse balance update
+            const balanceChange = (tx.type === 'ENTRÉE' ? -tx.amount : tx.amount);
+            if (tx.bank_account_id) {
+                await db.query(
+                    'UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2',
+                    [balanceChange, tx.bank_account_id]
+                );
+            }
 
-        // Reverse budget update
-        if (tx.type === 'SORTIE' && tx.activity) {
-            await db.query(
-                'UPDATE budgets SET spent_amount = spent_amount - $1 WHERE activity = $2 AND period_start <= $3 AND period_end >= $3',
-                [tx.amount, tx.activity, tx.date]
-            );
+            // Reverse budget update
+            if (tx.type === 'SORTIE' && tx.activity) {
+                await db.query(
+                    'UPDATE budgets SET spent_amount = spent_amount - $1 WHERE activity = $2 AND period_start <= $3 AND period_end >= $3',
+                    [tx.amount, tx.activity, tx.date]
+                );
+            }
         }
     }
 
-    await db.query('DELETE FROM transactions WHERE id = $1', [req.params.id]);
+    await db.query('UPDATE transactions SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [req.params.id]);
 
     await db.query('COMMIT');
     res.json({ message: 'Deleted' });

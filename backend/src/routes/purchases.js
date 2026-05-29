@@ -12,6 +12,7 @@ router.get('/', async (req, res) => {
       SELECT p.*, s.name as supplier_name
       FROM purchases p
       JOIN suppliers s ON p.supplier_id = s.id
+      WHERE p.deleted_at IS NULL
       ORDER BY p.id DESC
     `;
     const result = await db.query(query);
@@ -232,9 +233,22 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.post('/:id/validate', authorize(['Admin', 'RH/Comptable']), async (req, res) => {
+  try {
+    const result = await db.query(
+      'UPDATE purchases SET is_validated = TRUE, validation_date = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Achat non trouvé' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM purchases WHERE id = $1', [req.params.id]);
+    await db.query('UPDATE purchases SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [req.params.id]);
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

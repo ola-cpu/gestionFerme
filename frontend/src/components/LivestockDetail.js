@@ -10,6 +10,8 @@ function LivestockDetail({ user, batch, onBack }) {
   const [slaughterRecords, setSlaughterRecords] = useState([]);
   const [reproductionRecords, setReproductionRecords] = useState([]);
   const [performance, setPerformance] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [activeTab, setActiveTab] = useState('individuals');
   const [showAddIndividual, setShowAddIndividual] = useState(false);
   const [newIndividual, setNewIndividual] = useState({
@@ -25,7 +27,7 @@ function LivestockDetail({ user, batch, onBack }) {
 
   const fetchBatchData = useCallback(async () => {
     try {
-      const [indRes, healthRes, feedingRes, slaughterRes, perfRes, reproRes, breedRes, locRes] = await Promise.all([
+      const [indRes, healthRes, feedingRes, slaughterRes, perfRes, reproRes, breedRes, locRes, recRes, docRes] = await Promise.all([
         fetch(`/api/livestock/${batch.id}/individuals`, { headers: { 'X-User-ID': user?.id } }),
         fetch(`/api/livestock/${batch.id}/health`, { headers: { 'X-User-ID': user?.id } }),
         fetch(`/api/livestock/${batch.id}/feeding`, { headers: { 'X-User-ID': user?.id } }),
@@ -33,7 +35,9 @@ function LivestockDetail({ user, batch, onBack }) {
         fetch(`/api/livestock/${batch.id}/performance`, { headers: { 'X-User-ID': user?.id } }),
         fetch(`/api/livestock/${batch.id}/reproduction`, { headers: { 'X-User-ID': user?.id } }),
         fetch('/api/livestock/breeds', { headers: { 'X-User-ID': user?.id } }),
-        fetch('/api/livestock/locations', { headers: { 'X-User-ID': user?.id } })
+        fetch('/api/livestock/locations', { headers: { 'X-User-ID': user?.id } }),
+        fetch(`/api/livestock/${batch.id}/recommendations`, { headers: { 'X-User-ID': user?.id } }),
+        fetch(`/api/documents/Livestock/${batch.id}`, { headers: { 'X-User-ID': user?.id } })
       ]);
 
       const indData = await indRes.json();
@@ -53,6 +57,10 @@ function LivestockDetail({ user, batch, onBack }) {
       setBreeds(Array.isArray(breedData) ? breedData : []);
       setLocations(locData);
       setPerformance(perfData.error ? null : perfData);
+      const recData = await recRes.json();
+      setRecommendations(Array.isArray(recData) ? recData : []);
+      const docData = await docRes.json();
+      setDocuments(Array.isArray(docData) ? docData : []);
     } catch (err) {
       console.error("Error fetching batch details", err);
     }
@@ -277,12 +285,48 @@ function LivestockDetail({ user, batch, onBack }) {
               </table>
             </div>
           );
+      case 'documents':
+          return (
+              <div>
+                  <h3>Gestion Documentaire</h3>
+                  <table>
+                      <thead>
+                          <tr>
+                              <th>Fichier</th>
+                              <th>Type</th>
+                              <th>Date</th>
+                              <th>Notes</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {documents.map(doc => (
+                              <tr key={doc.id}>
+                                  <td><a href={doc.file_url} target="_blank" rel="noreferrer">{doc.file_name}</a></td>
+                                  <td>{doc.document_type}</td>
+                                  <td>{new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                                  <td>{doc.notes}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          );
       case 'performance':
         return (
           <div>
-            <h3>Performances</h3>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <h3>Performances & IA</h3>
+                {recommendations.length > 0 && (
+                    <div className="alerts-box" style={{background: '#fff4f4', padding: '10px', borderRadius: '8px', borderLeft: '4px solid #ef4444'}}>
+                        <h4 style={{margin: 0, fontSize: '14px', color: '#ef4444'}}>Recommandations</h4>
+                        <ul style={{margin: '5px 0 0 0', fontSize: '12px'}}>
+                            {recommendations.map((r, i) => <li key={i}><strong>{r.type}:</strong> {r.reason}</li>)}
+                        </ul>
+                    </div>
+                )}
+            </div>
             {performance && (
-              <div className="performance-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px'}}>
+              <div className="performance-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '15px'}}>
                 <div className="performance-card" style={{padding: '10px', border: '1px solid #ccc'}}>
                   <h5>GMQ</h5>
                   <p>{performance.gmq}</p>
@@ -320,6 +364,7 @@ function LivestockDetail({ user, batch, onBack }) {
         <button onClick={() => setActiveTab('slaughter')} style={{fontWeight: activeTab === 'slaughter' ? 'bold' : 'normal'}}>Abattage</button>
         <button onClick={() => setActiveTab('reproduction')} style={{fontWeight: activeTab === 'reproduction' ? 'bold' : 'normal'}}>Reproduction</button>
         <button onClick={() => setActiveTab('performance')} style={{fontWeight: activeTab === 'performance' ? 'bold' : 'normal'}}>Performance</button>
+        <button onClick={() => setActiveTab('documents')} style={{fontWeight: activeTab === 'documents' ? 'bold' : 'normal'}}>Documents</button>
       </div>
 
       <div className="tab-content">

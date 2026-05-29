@@ -13,7 +13,7 @@ router.use(authorize(['Chef d’élevage', 'Vétérinaire/technicien']));
 // GET all batches
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query('SELECT b.*, s.name as species_name FROM livestock_batches b LEFT JOIN species s ON b.species_id = s.id ORDER BY b.id DESC');
+    const result = await db.query('SELECT b.*, s.name as species_name FROM livestock_batches b LEFT JOIN species s ON b.species_id = s.id WHERE b.deleted_at IS NULL ORDER BY b.id DESC');
     res.json(result.rows);
   } catch (err) {
     res.json([{ id: 1, species_id: 1, batch_name: 'Demo Lot', current_count: 10, status: 'Active', species_name: 'Bovins' }]);
@@ -51,7 +51,7 @@ router.put('/:id', async (req, res) => {
 // DELETE a batch
 router.delete('/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM livestock_batches WHERE id = $1', [req.params.id]);
+    await db.query('UPDATE livestock_batches SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [req.params.id]);
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -63,7 +63,7 @@ router.delete('/:id', async (req, res) => {
 // GET individuals for a batch
 router.get('/:id/individuals', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM livestock_individuals WHERE batch_id = $1', [req.params.id]);
+    const result = await db.query('SELECT * FROM livestock_individuals WHERE batch_id = $1 AND deleted_at IS NULL', [req.params.id]);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -342,7 +342,152 @@ router.post('/mortality', async (req, res) => {
   }
 });
 
+// --- CONSANGUINITY ---
+
+// Recursive helper to get ancestors
+async function getAncestors(individualId, depth = 3) {
+  if (depth === 0 || !individualId) return [];
+  const res = await db.query('SELECT mother_id, father_id FROM livestock_individuals WHERE id = $1', [individualId]);
+  if (res.rows.length === 0) return [];
+  const { mother_id, father_id } = res.rows[0];
+  let ancestors = [];
+  if (mother_id) ancestors.push(mother_id, ...(await getAncestors(mother_id, depth - 1)));
+  if (father_id) ancestors.push(father_id, ...(await getAncestors(father_id, depth - 1)));
+  return ancestors;
+}
+
+router.get('/individuals/:id/consanguinity', async (req, res) => {
+  try {
+    const individualId = req.params.id;
+    const individualRes = await db.query('SELECT mother_id, father_id FROM livestock_individuals WHERE id = $1', [individualId]);
+
+    if (individualRes.rows.length === 0) return res.status(404).json({ error: 'Animal non trouvé' });
+
+    const { mother_id, father_id } = individualRes.rows[0];
+    if (!mother_id || !father_id) {
+        return res.json({ risk: 'Faible', common_ancestors: [], message: 'Parenté incomplète pour analyse' });
+    }
+
+    const maternalAncestors = await getAncestors(mother_id, 3);
+    const paternalAncestors = await getAncestors(father_id, 3);
+
+    const commonAncestors = maternalAncestors.filter(id => paternalAncestors.includes(id));
+    const uniqueCommon = [...new Set(commonAncestors)];
+
+    let risk = 'Faible';
+    if (uniqueCommon.length > 0) risk = 'Élevé';
+    else if (maternalAncestors.some(id => id === father_id) || paternalAncestors.some(id => id === mother_id)) risk = 'Critique';
+
+    res.json({ risk, common_ancestors: uniqueCommon, maternal_side: maternalAncestors, paternal_side: paternalAncestors });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- RECOMMENDATIONS ---
+
+// GET recommendations for a batch
+router.get('/:id/recommendations', async (req, res) => {
+  try {
+    const batchId = req.params.id;
+    // Suggest based on batch performance
+    const performance = await db.query('SELECT current_count, initial_count FROM livestock_batches WHERE id = $1', [batchId]);
+    if (performance.rows.length === 0) return res.status(404).json({ error: 'Lot non trouvé' });
+
+    let recommendations = [];
+    const mortality = performance.rows[0].initial_count - performance.rows[0].current_count;
+    const mortalityRate = (mortality / performance.rows[0].initial_count) * 100;
+
+    if (mortalityRate > 10) recommendations.push({ type: 'Alerte', priority: 'Critique', reason: 'Taux de mortalité élevé (' + mortalityRate.toFixed(1) + '%)' });
+    else recommendations.push({ type: 'Suivi', priority: 'Basse', reason: 'Performances du lot dans les normes' });
+
+    res.json(recommendations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/individuals/:id/recommendations', async (req, res) => {
+  try {
+    const individualId = req.params.id;
+    const individualRes = await db.query(`
+        SELECT i.*, s.avg_weight_kg, s.fattening_duration_days
+        FROM livestock_individuals i
+        JOIN livestock_batches b ON i.batch_id = b.id
+        JOIN species s ON b.species_id = s.id
+        WHERE i.id = $1
+    `, [individualId]);
+
+    if (individualRes.rows.length === 0) return res.status(404).json({ error: 'Animal non trouvé' });
+    const animal = individualRes.rows[0];
+
+    // Latest weights
+    const weights = await db.query('SELECT weight, record_date FROM weight_records WHERE individual_id = $1 ORDER BY record_date DESC LIMIT 2', [individualId]);
+
+    let recommendations = [];
+
+    // 1. Growth Check (Using GMQ)
+    if (weights.rows.length >= 2) {
+        const latest = weights.rows[0];
+        const previous = weights.rows[1];
+        const weightDiff = latest.weight - previous.weight;
+        const dateDiff = (new Date(latest.record_date) - new Date(previous.record_date)) / (1000 * 60 * 60 * 24);
+
+        if (dateDiff > 0) {
+            const gmq = weightDiff / dateDiff;
+            if (gmq <= 0) recommendations.push({ type: 'Réforme', priority: 'Haute', reason: 'Croissance nulle ou négative (GMQ: ' + gmq.toFixed(3) + ')' });
+            else if (gmq < (animal.avg_weight_kg * 0.001)) recommendations.push({ type: 'Réforme', priority: 'Moyenne', reason: 'Faible croissance détectée (GMQ: ' + gmq.toFixed(3) + ')' });
+        }
+    } else if (weights.rows.length === 0) {
+        recommendations.push({ type: 'Suivi', priority: 'Moyenne', reason: 'Aucune pesée enregistrée' });
+    }
+
+    // 2. Age / Fattening Check
+    if (animal.birth_date) {
+        const ageInDays = (new Date() - new Date(animal.birth_date)) / (1000 * 60 * 60 * 24);
+        if (animal.fattening_duration_days && ageInDays > animal.fattening_duration_days * 1.2) {
+            recommendations.push({ type: 'Vente', priority: 'Haute', reason: 'Durée d\'engraissement optimale dépassée' });
+        }
+    }
+
+    // 3. Selection for Breeding
+    if (animal.status === 'Active' && weights.rows.length > 0 && weights.rows[0].weight > animal.avg_weight_kg * 0.8) {
+        recommendations.push({ type: 'Sélection', priority: 'Basse', reason: 'Bon développement : potentiel reproducteur' });
+    }
+
+    res.json(recommendations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- PERFORMANCE ---
+
+// GET GMQ for an individual
+router.get('/individuals/:id/gmq', async (req, res) => {
+  try {
+    const weights = await db.query(
+      'SELECT weight, record_date FROM weight_records WHERE individual_id = $1 ORDER BY record_date DESC LIMIT 2',
+      [req.params.id]
+    );
+
+    if (weights.rows.length < 2) {
+      return res.json({ gmq: 0, unit: 'kg/day', message: 'Pas assez de données de poids' });
+    }
+
+    const latest = weights.rows[0];
+    const previous = weights.rows[1];
+    const weightDiff = latest.weight - previous.weight;
+    const dateDiff = (new Date(latest.record_date) - new Date(previous.record_date)) / (1000 * 60 * 60 * 24);
+
+    if (dateDiff <= 0) return res.json({ gmq: 0, unit: 'kg/day', message: 'Dates de pesée invalides' });
+
+    const gmq = weightDiff / dateDiff;
+    res.json({ gmq: gmq.toFixed(3), unit: 'kg/day', latest_weight: latest.weight, previous_weight: previous.weight, days: dateDiff });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET performance metrics for a batch
 router.get('/:id/performance', async (req, res) => {

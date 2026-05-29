@@ -30,6 +30,9 @@ function App() {
   const [activeModule, setActiveModule] = useState(null);
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [selectedCycle, setSelectedCycle] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearch, setShowSearch] = useState(false);
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -72,6 +75,24 @@ function App() {
   const authorizedModules = (user?.role === 'Admin' || user?.role === 'Super Admin')
     ? modules
     : modules.filter(m => m.roles.includes(user?.role));
+
+  useEffect(() => {
+    const performSearch = async () => {
+      if (searchQuery.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/reports/search?q=${searchQuery}`, { headers: { 'X-User-ID': user?.id } });
+        const data = await res.json();
+        setSearchResults(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    const timer = setTimeout(performSearch, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, user?.id]);
 
   const handleSelectBatch = (batch) => {
     setSelectedBatch(batch);
@@ -227,7 +248,44 @@ function App() {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                 <Search size={16} />
               </div>
-              <input type="text" placeholder="Recherche globale..." className="bg-slate-50 border-none rounded-lg py-1.5 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary-500/20 w-64" />
+              <input
+                type="text"
+                placeholder="Recherche globale..."
+                className="bg-slate-50 border-none rounded-lg py-1.5 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary-500/20 w-64"
+                value={searchQuery}
+                onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowSearch(true);
+                }}
+                onFocus={() => setShowSearch(true)}
+              />
+              {showSearch && searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                      {searchResults.map((res, i) => (
+                          <div
+                            key={i}
+                            className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
+                            onClick={() => {
+                                if (res.type === 'Livestock') {
+                                    setActiveModule('elevage');
+                                    setSelectedBatch({ id: res.id, batch_name: res.title });
+                                } else if (res.type === 'Crop') {
+                                    setActiveModule('cultures');
+                                    setSelectedCycle(res.id);
+                                }
+                                setShowSearch(false);
+                                setSearchQuery('');
+                            }}
+                          >
+                              <div className="flex items-center justify-between">
+                                  <span className="text-sm font-semibold text-slate-800">{res.title}</span>
+                                  <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 uppercase">{res.type}</span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">{res.subtitle}</p>
+                          </div>
+                      ))}
+                  </div>
+              )}
             </div>
 
             <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative">
