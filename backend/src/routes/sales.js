@@ -1,8 +1,9 @@
 const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
 const db = require('../config/db');
 const { logAction } = require('../utils/auditLogger');
 const { authorize } = require('../middleware/auth');
+const { deductStockFIFO } = require('../utils/stockUtils');
 
 // Apply authorization to all sales routes
 router.use(authorize(['Commercial']));
@@ -26,23 +27,136 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * Helper to process sale items (DB inserts and stock deduction)
+ */
+async function processSaleItems(client, saleId, items, document_type, reference_number, user_id) {
+    for (const item of items) {
+        await db.query(
+            'INSERT INTO sale_items (sale_id, batch_id, individual_id, stock_item_id, product_description, quantity, unit_price, total_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+            [saleId, item.batch_id, item.individual_id, item.stock_item_id, item.product_description, item.quantity, item.unit_price, item.total_price]
+        );
+
+        const isConfirmed = ['Facture', 'Bon de commande'].includes(document_type);
+
+        if (item.stock_item_id && isConfirmed) {
+            // Assuming warehouse_id is handled (default to 1 for this implementation)
+            await deductStockFIFO(item.stock_item_id, 1, item.quantity, `Vente #${reference_number}`, user_id);
+        }
+
+        if (item.individual_id && isConfirmed) {
+            await db.query('UPDATE livestock_individuals SET status = \'Sold\' WHERE id = $1', [item.individual_id]);
+        }
+    }
+}
+
 router.post('/', async (req, res) => {
-  const { client_id, sale_date, total_amount, payment_status, document_type, reference_number, delivery_status, user_id } = req.body;
+  const { client_id, sale_date, total_amount, tax_amount, discount_amount, payment_status, document_type, reference_number, valid_until, items } = req.body;
+  const user_id = req.user.id;
+
   try {
+    await db.query('BEGIN');
+
+    // 1. Credit Limit Check
+    if (document_type !== 'Devis') {
+        const clientRes = await db.query('SELECT credit_limit FROM clients WHERE id = $1', [client_id]);
+        const debtRes = await db.query('SELECT COALESCE(SUM(total_amount), 0) - (SELECT COALESCE(SUM(amount), 0) FROM sale_payments WHERE sale_id IN (SELECT id FROM sales WHERE client_id = $1)) as balance FROM sales WHERE client_id = $1', [client_id]);
+        const currentDebt = parseFloat(debtRes.rows[0]?.balance || 0);
+        if (clientRes.rows[0].credit_limit > 0 && (currentDebt + total_amount) > clientRes.rows[0].credit_limit) {
+            throw new Error('Dépassement du plafond de crédit client');
+        }
+    }
+
+    // 2. Stock Availability Check
+    if (['Facture', 'Bon de commande'].includes(document_type)) {
+        for (const item of items) {
+            if (item.stock_item_id) {
+                const stockRes = await db.query('SELECT current_stock FROM stock_items WHERE id = $1', [item.stock_item_id]);
+                if (stockRes.rows[0].current_stock < item.quantity) {
+                    throw new Error(`Stock insuffisant pour le produit ID ${item.stock_item_id}`);
+                }
+            }
+        }
+    }
+
+    // 3. Create Sale
     const result = await db.query(
-      'INSERT INTO sales (client_id, sale_date, total_amount, payment_status, document_type, reference_number, delivery_status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [client_id, sale_date, total_amount, payment_status, document_type, reference_number, delivery_status]
+      'INSERT INTO sales (client_id, sale_date, total_amount, tax_amount, discount_amount, payment_status, document_type, reference_number, valid_until) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [client_id, sale_date, total_amount, tax_amount || 0, discount_amount || 0, payment_status, document_type, reference_number, valid_until]
     );
+    const saleId = result.rows[0].id;
 
-    await logAction(user_id, 'CREATE_SALE', 'sales', result.rows[0].id, { reference_number, total_amount });
+    // 4. Process Items
+    await processSaleItems(null, saleId, items, document_type, reference_number, user_id);
 
+    await logAction(user_id, 'CREATE_SALE', 'sales', saleId, { reference_number, total_amount });
+
+    await db.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') { // Unique constraint violation
-        return res.status(400).json({ error: 'Reference number already exists' });
+    await db.query('ROLLBACK');
+    if (err.code === '23505') {
+        return res.status(400).json({ error: 'Référence déjà existante' });
     }
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST Convert Quote to Order/Invoice
+router.post('/convert/:id', async (req, res) => {
+    const quoteId = req.params.id;
+    const { target_type, reference_number } = req.body;
+
+    try {
+        await db.query('BEGIN');
+
+        const quoteRes = await db.query('SELECT * FROM sales WHERE id = $1 AND document_type = \'Devis\'', [quoteId]);
+        if (quoteRes.rows.length === 0) throw new Error('Devis non trouvé');
+        const quote = quoteRes.rows[0];
+
+        const itemsRes = await db.query('SELECT * FROM sale_items WHERE sale_id = $1', [quoteId]);
+
+        const newSaleRes = await db.query(
+            'INSERT INTO sales (client_id, sale_date, total_amount, tax_amount, discount_amount, payment_status, document_type, reference_number) VALUES ($1, CURRENT_DATE, $2, $3, $4, \'Pending\', $5, $6) RETURNING id',
+            [quote.client_id, quote.total_amount, quote.tax_amount, quote.discount_amount, target_type, reference_number]
+        );
+        const newSaleId = newSaleRes.rows[0].id;
+
+        await processSaleItems(null, newSaleId, itemsRes.rows, target_type, reference_number, req.user.id);
+
+        await db.query('UPDATE sales SET document_type = \'Devis Converti\' WHERE id = $1', [quoteId]);
+
+        await db.query('COMMIT');
+        res.json({ id: newSaleId, message: 'Devis converti avec succès' });
+    } catch (err) {
+        await db.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- DELIVERIES ---
+router.post('/:id/deliveries', async (req, res) => {
+    const sale_id = req.params.id;
+    const { driver_name, vehicle_plate, notes } = req.body;
+    try {
+        const result = await db.query(
+            'INSERT INTO deliveries (sale_id, delivery_date, driver_name, vehicle_plate, status, notes) VALUES ($1, CURRENT_TIMESTAMP, $2, $3, \'Pending\', $4) RETURNING *',
+            [sale_id, driver_name, vehicle_plate, notes]
+        );
+        await db.query('UPDATE sales SET delivery_status = \'Shipped\' WHERE id = $1', [sale_id]);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/deliveries/all', async (req, res) => {
+    try {
+        const result = await db.query('SELECT d.*, s.reference_number, c.name as client_name FROM deliveries d JOIN sales s ON d.sale_id = s.id JOIN clients c ON s.client_id = c.id');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 router.put('/:id', async (req, res) => {
