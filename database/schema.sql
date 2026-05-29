@@ -160,8 +160,17 @@ CREATE TABLE mortality_records (
 -- 2. STOCKS & MAGASIN
 -- ==========================================
 
+CREATE TABLE farms (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    location TEXT,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE warehouses (
     id SERIAL PRIMARY KEY,
+    farm_id INTEGER REFERENCES farms(id),
     name VARCHAR(100) NOT NULL,
     type VARCHAR(50), -- Magasin, Entrepôt, Dépôt
     location TEXT,
@@ -262,6 +271,7 @@ CREATE TABLE inventory_take_items (
 
 CREATE TABLE plots (
     id SERIAL PRIMARY KEY,
+    farm_id INTEGER REFERENCES farms(id),
     name VARCHAR(100) NOT NULL,
     area_hectares DECIMAL(10,2),
     soil_type VARCHAR(100),
@@ -511,15 +521,65 @@ CREATE TABLE promotions (
 -- 6. PERSONNEL & PAIE
 -- ==========================================
 
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    farm_id INTEGER REFERENCES farms(id),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    manager_id INTEGER
+);
+
+CREATE TABLE positions (
+    id SERIAL PRIMARY KEY,
+    department_id INTEGER REFERENCES departments(id),
+    title VARCHAR(100) NOT NULL,
+    description TEXT,
+    hierarchy_level INTEGER,
+    required_skills TEXT
+);
+
 CREATE TABLE employees (
     id SERIAL PRIMARY KEY,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    position VARCHAR(100),
+    matricule VARCHAR(50) UNIQUE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    photo_url TEXT,
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    address TEXT,
+    birth_date DATE,
+    department_id INTEGER REFERENCES departments(id),
+    position_id INTEGER REFERENCES positions(id),
     hire_date DATE,
     base_salary DECIMAL(12,2),
-    contract_type VARCHAR(50), -- Permanent, CDD, Seasonal
-    status VARCHAR(50) DEFAULT 'Active'
+    contract_type VARCHAR(50), -- CDI, CDD, Journalier, Saisonnier, Prestataire, Stage
+    payment_frequency VARCHAR(20) DEFAULT 'Mensuel', -- Mensuel, Hebdomadaire, Journalier
+    status VARCHAR(50) DEFAULT 'Actif', -- Actif, Congé, Suspendu, Licencié, Démissionnaire
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Link departments manager back to employees
+ALTER TABLE departments ADD CONSTRAINT fk_manager FOREIGN KEY (manager_id) REFERENCES employees(id) ON DELETE SET NULL;
+
+CREATE TABLE employee_documents (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    document_type VARCHAR(50), -- Contrat, Diplôme, Médical, Permis, ID
+    file_url TEXT NOT NULL,
+    expiry_date DATE,
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE contracts (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    contract_type VARCHAR(50),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    salary DECIMAL(12,2),
+    status VARCHAR(50) DEFAULT 'En cours', -- En cours, Terminé, Rompu, Renouvelé
+    auto_renewal BOOLEAN DEFAULT FALSE,
+    notes TEXT
 );
 
 CREATE TABLE attendance (
@@ -540,8 +600,45 @@ CREATE TABLE payrolls (
     payment_date DATE DEFAULT CURRENT_DATE,
     base_salary_paid DECIMAL(12,2),
     bonuses DECIMAL(12,2) DEFAULT 0,
-    deductions DECIMAL(12,2) DEFAULT 0, -- Advances, taxes, etc.
+    overtime_amount DECIMAL(12,2) DEFAULT 0,
+    deductions DECIMAL(12,2) DEFAULT 0, -- Taxes, insurance
+    advances_repayment DECIMAL(12,2) DEFAULT 0,
     net_salary DECIMAL(12,2)
+);
+
+CREATE TABLE leave_requests (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    leave_type VARCHAR(50), -- Annuel, Maladie, Permission, Injustifiée
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason TEXT,
+    status VARCHAR(50) DEFAULT 'En attente', -- En attente, Approuvé, Rejeté
+    approved_by INTEGER REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE salary_advances (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    request_date DATE DEFAULT CURRENT_DATE,
+    amount DECIMAL(12,2) NOT NULL,
+    repayment_start_month INTEGER,
+    repayment_start_year INTEGER,
+    repayment_months INTEGER DEFAULT 1,
+    status VARCHAR(50) DEFAULT 'En attente', -- En attente, Approuvé, Rejeté, Remboursé
+    notes TEXT
+);
+
+CREATE TABLE performance_evaluations (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    evaluation_date DATE DEFAULT CURRENT_DATE,
+    evaluator_id INTEGER REFERENCES employees(id),
+    score INTEGER, -- 1-5 or 1-100
+    productivity_rating VARCHAR(50),
+    comments TEXT,
+    goals TEXT
 );
 
 CREATE TABLE work_schedules (
@@ -556,15 +653,42 @@ CREATE TABLE work_schedules (
 -- 7. TRÉSORERIE (Finance)
 -- ==========================================
 
+CREATE TABLE bank_accounts (
+    id SERIAL PRIMARY KEY,
+    farm_id INTEGER REFERENCES farms(id),
+    account_name VARCHAR(100) NOT NULL,
+    account_type VARCHAR(50), -- Caisse, Banque, Mobile Money
+    bank_name VARCHAR(100),
+    account_number VARCHAR(50),
+    currency VARCHAR(10) DEFAULT 'FCFA',
+    current_balance DECIMAL(15,2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
 CREATE TABLE transactions (
     id SERIAL PRIMARY KEY,
+    bank_account_id INTEGER REFERENCES bank_accounts(id),
     date DATE NOT NULL,
-    type VARCHAR(10), -- IN / OUT
+    type VARCHAR(20), -- ENTRÉE / SORTIE
     category VARCHAR(100),
-    activity VARCHAR(50), -- Élevage, Cultures, Atelier, General
-    source VARCHAR(50), -- Caisse, Banque
-    amount DECIMAL(15,2),
-    description TEXT
+    activity VARCHAR(50), -- Élevage, Cultures, Atelier, Administration, Autre
+    amount DECIMAL(15,2) NOT NULL,
+    reference_number VARCHAR(100),
+    description TEXT,
+    user_id INTEGER REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE debts_receivables (
+    id SERIAL PRIMARY KEY,
+    entity_type VARCHAR(20), -- Fournisseur, Client, Employé, Autre
+    entity_name VARCHAR(100) NOT NULL,
+    type VARCHAR(10), -- DETTE / CRÉANCE
+    amount DECIMAL(15,2) NOT NULL,
+    due_date DATE,
+    status VARCHAR(50) DEFAULT 'En attente', -- En attente, Partiel, Payé
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE budgets (

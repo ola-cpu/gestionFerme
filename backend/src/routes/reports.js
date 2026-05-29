@@ -5,6 +5,10 @@ const db = require('../config/db');
 // GET KPIs for the dashboard
 router.get('/kpis', async (req, res) => {
   try {
+    // Personnel KPIs
+    const employeeCount = await db.query('SELECT COUNT(*) FROM employees WHERE status = \'Actif\'');
+    const leaveCount = await db.query('SELECT COUNT(*) FROM leave_requests WHERE status = \'Approuvé\' AND CURRENT_DATE BETWEEN start_date AND end_date');
+
     // Performance livestock
     const mortalityRes = await db.query('SELECT COUNT(*) FROM mortality_records');
     const batchRes = await db.query('SELECT SUM(initial_count) as total_initial FROM livestock_batches');
@@ -14,9 +18,14 @@ router.get('/kpis', async (req, res) => {
 
     // Financials
     const salesRes = await db.query('SELECT SUM(total_amount) as total_sales FROM sales');
-    const expensesRes = await db.query('SELECT SUM(amount) as total_expenses FROM transactions WHERE type = \'OUT\'');
+    const expensesRes = await db.query('SELECT SUM(amount) as total_expenses FROM transactions WHERE type = \'SORTIE\'');
+    const bankBalance = await db.query('SELECT SUM(current_balance) FROM bank_accounts');
 
     const cashFlow = (salesRes.rows[0].total_sales || 0) - (expensesRes.rows[0].total_expenses || 0);
+
+    // Debts & Receivables
+    const totalDettes = await db.query('SELECT SUM(amount) FROM debts_receivables WHERE type = \'DETTE\' AND status != \'Payé\'');
+    const totalCreances = await db.query('SELECT SUM(amount) FROM debts_receivables WHERE type = \'CRÉANCE\' AND status != \'Payé\'');
 
     // Purchases KPIs
     const purchaseExpenses = await db.query('SELECT SUM(total_amount) FROM purchases WHERE status != \'Cancelled\'');
@@ -32,7 +41,12 @@ router.get('/kpis', async (req, res) => {
       cash_flow: cashFlow || 450000,
       inventory_value: (stockValueRes.rows[0].total_value || 0).toLocaleString() + ' FCFA',
       total_purchase_expenses: purchaseExpenses.rows[0].sum || 0,
-      pending_purchase_requests: pendingRequests.rows[0].count || 0
+      pending_purchase_requests: pendingRequests.rows[0].count || 0,
+      active_employees: employeeCount.rows[0].count || 0,
+      employees_on_leave: leaveCount.rows[0].count || 0,
+      total_bank_balance: bankBalance.rows[0].sum || 0,
+      total_debts: totalDettes.rows[0].sum || 0,
+      total_receivables: totalCreances.rows[0].sum || 0
     });
   } catch (err) {
     res.json({
