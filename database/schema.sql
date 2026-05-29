@@ -40,12 +40,46 @@ CREATE TABLE users (
 
 CREATE TABLE species (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL -- Bovins, Ovins, Volailles, etc.
+    name VARCHAR(50) NOT NULL, -- Bovins, Ovins, Volailles, etc.
+    gestation_duration_days INTEGER,
+    adult_age_months INTEGER,
+    feed_type VARCHAR(100),
+    care_frequency VARCHAR(100),
+    fattening_duration_days INTEGER,
+    avg_weight_kg DECIMAL(10,2),
+    expected_yield DECIMAL(10,2)
 );
 
 -- Initial species
-INSERT INTO species (name) VALUES
-('Bovins'), ('Ovins'), ('Caprins'), ('Volailles'), ('Porcins'), ('Poissons');
+INSERT INTO species (name, gestation_duration_days, adult_age_months, feed_type, avg_weight_kg) VALUES
+('Bovins', 283, 24, 'Herbe/Fourrage', 450.00),
+('Ovins', 150, 12, 'Herbe', 60.00),
+('Caprins', 150, 12, 'Herbe/Arbustes', 50.00),
+('Volailles', 21, 6, 'Grains', 2.50),
+('Porcins', 114, 10, 'Tout', 100.00),
+('Poissons', 0, 12, 'Granulés', 1.00);
+
+CREATE TABLE breeds (
+    id SERIAL PRIMARY KEY,
+    species_id INTEGER REFERENCES species(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL
+);
+
+INSERT INTO breeds (species_id, name) VALUES
+(1, 'Goudali'), (3, 'Boer'), (4, 'Ponte locale');
+
+CREATE TABLE buildings (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(50) -- Écurie, Poulailler, etc.
+);
+
+CREATE TABLE pens (
+    id SERIAL PRIMARY KEY,
+    building_id INTEGER REFERENCES buildings(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    capacity INTEGER
+);
 
 CREATE TABLE livestock_batches (
     id SERIAL PRIMARY KEY,
@@ -61,10 +95,16 @@ CREATE TABLE livestock_batches (
 CREATE TABLE livestock_individuals (
     id SERIAL PRIMARY KEY,
     batch_id INTEGER REFERENCES livestock_batches(id) ON DELETE CASCADE,
+    breed_id INTEGER REFERENCES breeds(id),
+    pen_id INTEGER REFERENCES pens(id),
+    mother_id INTEGER REFERENCES livestock_individuals(id),
+    father_id INTEGER REFERENCES livestock_individuals(id),
     identification_code VARCHAR(50) UNIQUE,
+    name VARCHAR(100),
     birth_date DATE,
     gender VARCHAR(10), -- Male, Female
-    status VARCHAR(50) DEFAULT 'Active' -- Active, Sold, Deceased
+    provenance VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'Active' -- Active, Sold, Deceased, Reproducteur, Engraissement, Gestante, Malade, Réformé
 );
 
 CREATE TABLE weight_records (
@@ -101,8 +141,10 @@ CREATE TABLE feeding_records (
 CREATE TABLE reproduction_records (
     id SERIAL PRIMARY KEY,
     individual_id INTEGER REFERENCES livestock_individuals(id) ON DELETE CASCADE,
+    partner_id INTEGER REFERENCES livestock_individuals(id),
     event_date DATE NOT NULL,
-    event_type VARCHAR(50), -- Heat, Insemination, Birth
+    event_type VARCHAR(50), -- Heat, Insemination, Mating, Birth
+    expected_birth_date DATE,
     result TEXT
 );
 
@@ -443,4 +485,14 @@ CREATE TABLE slaughter_records (
     health_certificate_ref VARCHAR(100),
     inspector_name VARCHAR(100),
     details TEXT
+);
+
+CREATE TABLE alerts (
+    id SERIAL PRIMARY KEY,
+    type VARCHAR(50), -- Vaccine, Birth, Heat, Stock
+    message TEXT NOT NULL,
+    record_id INTEGER,
+    table_name VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'Pending', -- Pending, Resolved
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

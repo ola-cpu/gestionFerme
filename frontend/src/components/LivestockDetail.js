@@ -1,21 +1,39 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 function LivestockDetail({ user, batch, onBack }) {
   const [individuals, setIndividuals] = useState([]);
+  const [breeds, setBreeds] = useState([]);
+  const [locations, setLocations] = useState({ buildings: [], pens: [] });
   const [healthRecords, setHealthRecords] = useState([]);
   const [feedingRecords, setFeedingRecords] = useState([]);
   const [slaughterRecords, setSlaughterRecords] = useState([]);
+  const [reproductionRecords, setReproductionRecords] = useState([]);
   const [performance, setPerformance] = useState(null);
   const [activeTab, setActiveTab] = useState('individuals');
+  const [showAddIndividual, setShowAddIndividual] = useState(false);
+  const [newIndividual, setNewIndividual] = useState({
+    identification_code: '',
+    name: '',
+    gender: 'Female',
+    birth_date: '',
+    breed_id: '',
+    pen_id: '',
+    provenance: '',
+    status: 'Active'
+  });
 
   const fetchBatchData = useCallback(async () => {
     try {
-      const [indRes, healthRes, feedingRes, slaughterRes, perfRes] = await Promise.all([
+      const [indRes, healthRes, feedingRes, slaughterRes, perfRes, reproRes, breedRes, locRes] = await Promise.all([
         fetch(`/api/livestock/${batch.id}/individuals`, { headers: { 'X-User-ID': user?.id } }),
         fetch(`/api/livestock/${batch.id}/health`, { headers: { 'X-User-ID': user?.id } }),
         fetch(`/api/livestock/${batch.id}/feeding`, { headers: { 'X-User-ID': user?.id } }),
         fetch(`/api/livestock/${batch.id}/slaughter`, { headers: { 'X-User-ID': user?.id } }),
-        fetch(`/api/livestock/${batch.id}/performance`, { headers: { 'X-User-ID': user?.id } })
+        fetch(`/api/livestock/${batch.id}/performance`, { headers: { 'X-User-ID': user?.id } }),
+        fetch(`/api/livestock/${batch.id}/reproduction`, { headers: { 'X-User-ID': user?.id } }),
+        fetch('/api/livestock/breeds', { headers: { 'X-User-ID': user?.id } }),
+        fetch('/api/livestock/locations', { headers: { 'X-User-ID': user?.id } })
       ]);
 
       const indData = await indRes.json();
@@ -23,31 +41,104 @@ function LivestockDetail({ user, batch, onBack }) {
       const feedingData = await feedingRes.json();
       const slaughterData = await slaughterRes.json();
       const perfData = await perfRes.json();
+      const reproData = await reproRes.json();
+      const breedData = await breedRes.json();
+      const locData = await locRes.json();
 
       setIndividuals(Array.isArray(indData) ? indData : []);
       setHealthRecords(Array.isArray(healthData) ? healthData : []);
       setFeedingRecords(Array.isArray(feedingData) ? feedingData : []);
       setSlaughterRecords(Array.isArray(slaughterData) ? slaughterData : []);
+      setReproductionRecords(Array.isArray(reproData) ? reproData : []);
+      setBreeds(Array.isArray(breedData) ? breedData : []);
+      setLocations(locData);
       setPerformance(perfData.error ? null : perfData);
     } catch (err) {
       console.error("Error fetching batch details", err);
     }
-  }, [batch.id]);
+  }, [batch.id, user?.id]);
 
   useEffect(() => {
     fetchBatchData();
   }, [fetchBatchData]);
+
+  const handleAddIndividual = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/livestock/individuals', {
+        method: 'POST',
+        headers: { 'X-User-ID': user?.id, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newIndividual, batch_id: batch.id })
+      });
+      if (response.ok) {
+        fetchBatchData();
+        setShowAddIndividual(false);
+        setNewIndividual({
+          identification_code: '',
+          name: '',
+          gender: 'Female',
+          birth_date: '',
+          breed_id: '',
+          pen_id: '',
+          provenance: '',
+          status: 'Active'
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'individuals':
         return (
           <div>
-            <h3>Individus</h3>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <h3>Individus</h3>
+                <button onClick={() => setShowAddIndividual(!showAddIndividual)}>
+                    {showAddIndividual ? 'Annuler' : 'Ajouter Individu'}
+                </button>
+            </div>
+
+            {showAddIndividual && (
+                <form onSubmit={handleAddIndividual} className="module-form" style={{marginBottom: '20px'}}>
+                    <input type="text" placeholder="Code ID" value={newIndividual.identification_code} onChange={e => setNewIndividual({...newIndividual, identification_code: e.target.value})} required />
+                    <input type="text" placeholder="Nom" value={newIndividual.name} onChange={e => setNewIndividual({...newIndividual, name: e.target.value})} />
+                    <select value={newIndividual.gender} onChange={e => setNewIndividual({...newIndividual, gender: e.target.value})}>
+                        <option value="Male">Mâle</option>
+                        <option value="Female">Femelle</option>
+                    </select>
+                    <input type="date" value={newIndividual.birth_date} onChange={e => setNewIndividual({...newIndividual, birth_date: e.target.value})} required />
+                    <select value={newIndividual.breed_id} onChange={e => setNewIndividual({...newIndividual, breed_id: e.target.value})}>
+                        <option value="">Sélectionner une race</option>
+                        {breeds.filter(b => b.species_id === batch.species_id).map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                    </select>
+                    <select value={newIndividual.pen_id} onChange={e => setNewIndividual({...newIndividual, pen_id: e.target.value})}>
+                        <option value="">Sélectionner un enclos</option>
+                        {locations.pens.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <input type="text" placeholder="Provenance" value={newIndividual.provenance} onChange={e => setNewIndividual({...newIndividual, provenance: e.target.value})} />
+                    <select value={newIndividual.status} onChange={e => setNewIndividual({...newIndividual, status: e.target.value})}>
+                        <option value="Active">Actif</option>
+                        <option value="Reproducteur">Reproducteur</option>
+                        <option value="Engraissement">Engraissement</option>
+                        <option value="Malade">Malade</option>
+                        <option value="Réformé">Réformé</option>
+                    </select>
+                    <button type="submit">Enregistrer</button>
+                </form>
+            )}
+
             <table>
               <thead>
                 <tr>
-                  <th>Code</th>
+                  <th>ID / QR</th>
+                  <th>Nom</th>
                   <th>Sexe</th>
                   <th>Date Naissance</th>
                   <th>Status</th>
@@ -56,7 +147,13 @@ function LivestockDetail({ user, batch, onBack }) {
               <tbody>
                 {individuals.map(ind => (
                   <tr key={ind.id}>
-                    <td>{ind.identification_code}</td>
+                    <td>
+                        <div style={{fontWeight: 'bold'}}>{ind.identification_code}</div>
+                        <div style={{marginTop: '5px'}}>
+                            <QRCodeSVG value={ind.identification_code} size={40} />
+                        </div>
+                    </td>
+                    <td>{ind.name || '-'}</td>
                     <td>{ind.gender}</td>
                     <td>{ind.birth_date}</td>
                     <td>{ind.status}</td>
@@ -152,6 +249,34 @@ function LivestockDetail({ user, batch, onBack }) {
             </table>
           </div>
         );
+      case 'reproduction':
+          return (
+            <div>
+              <h3>Suivi de Reproduction</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Événement</th>
+                    <th>Partenaire</th>
+                    <th>Date Mise Bas Prévue</th>
+                    <th>Résultat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reproductionRecords.map(rec => (
+                    <tr key={rec.id}>
+                      <td>{rec.event_date}</td>
+                      <td>{rec.event_type}</td>
+                      <td>{rec.partner_id || '-'}</td>
+                      <td>{rec.expected_birth_date || '-'}</td>
+                      <td>{rec.result}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
       case 'performance':
         return (
           <div>
@@ -193,6 +318,7 @@ function LivestockDetail({ user, batch, onBack }) {
         <button onClick={() => setActiveTab('health')} style={{fontWeight: activeTab === 'health' ? 'bold' : 'normal'}}>Santé</button>
         <button onClick={() => setActiveTab('feeding')} style={{fontWeight: activeTab === 'feeding' ? 'bold' : 'normal'}}>Alimentation</button>
         <button onClick={() => setActiveTab('slaughter')} style={{fontWeight: activeTab === 'slaughter' ? 'bold' : 'normal'}}>Abattage</button>
+        <button onClick={() => setActiveTab('reproduction')} style={{fontWeight: activeTab === 'reproduction' ? 'bold' : 'normal'}}>Reproduction</button>
         <button onClick={() => setActiveTab('performance')} style={{fontWeight: activeTab === 'performance' ? 'bold' : 'normal'}}>Performance</button>
       </div>
 

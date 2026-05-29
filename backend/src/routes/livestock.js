@@ -68,13 +68,36 @@ router.get('/:id/individuals', async (req, res) => {
   }
 });
 
+// GET reproduction records for a batch
+router.get('/:id/reproduction', async (req, res) => {
+    try {
+        const result = await db.query(
+            'SELECT r.* FROM reproduction_records r JOIN livestock_individuals i ON r.individual_id = i.id WHERE i.batch_id = $1 ORDER BY r.event_date DESC',
+            [req.params.id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE species
+router.delete('/species/:id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM species WHERE id = $1', [req.params.id]);
+        res.json({ message: 'Espèce supprimée' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // POST an individual
 router.post('/individuals', async (req, res) => {
-  const { batch_id, identification_code, birth_date, gender } = req.body;
+  const { batch_id, identification_code, birth_date, gender, breed_id, pen_id, name, provenance, status } = req.body;
   try {
     const result = await db.query(
-      'INSERT INTO livestock_individuals (batch_id, identification_code, birth_date, gender) VALUES ($1, $2, $3, $4) RETURNING *',
-      [batch_id, identification_code, birth_date, gender]
+      'INSERT INTO livestock_individuals (batch_id, identification_code, birth_date, gender, breed_id, pen_id, name, provenance, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [batch_id, identification_code, birth_date, gender, breed_id, pen_id, name, provenance, status]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -187,12 +210,57 @@ router.post('/feeding', async (req, res) => {
 
 // POST a reproduction record
 router.post('/reproduction', async (req, res) => {
-  const { individual_id, event_date, event_type, result: event_result } = req.body;
+  const { individual_id, partner_id, event_date, event_type, result: event_result } = req.body;
   try {
+    let expected_birth_date = null;
+
+    if (event_type === 'Insemination' || event_type === 'Mating') {
+        // Fetch species gestation duration
+        const speciesRes = await db.query(
+            'SELECT s.gestation_duration_days FROM species s JOIN livestock_batches b ON s.id = b.species_id JOIN livestock_individuals i ON b.id = i.batch_id WHERE i.id = $1',
+            [individual_id]
+        );
+        if (speciesRes.rows[0] && speciesRes.rows[0].gestation_duration_days) {
+            const eventDate = new Date(event_date);
+            eventDate.setDate(eventDate.getDate() + speciesRes.rows[0].gestation_duration_days);
+            expected_birth_date = eventDate.toISOString().split('T')[0];
+        }
+    }
+
     const result = await db.query(
-      'INSERT INTO reproduction_records (individual_id, event_date, event_type, result) VALUES ($1, $2, $3, $4) RETURNING *',
-      [individual_id, event_date, event_type, event_result]
+      'INSERT INTO reproduction_records (individual_id, partner_id, event_date, event_type, result, expected_birth_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [individual_id, partner_id, event_date, event_type, event_result, expected_birth_date]
     );
+
+    // Logic for Birth or Insemination/Mating
+    const animalRes = await db.query('SELECT gender, batch_id, breed_id, pen_id FROM livestock_individuals WHERE id = $1', [individual_id]);
+    const animal = animalRes.rows[0];
+
+    if (event_type === 'Birth' && animal.gender === 'Female') {
+        await db.query('UPDATE livestock_individuals SET status = \'Active\' WHERE id = $1', [individual_id]);
+
+        // Automatic offspring creation
+        const { offspring_count = 1 } = req.body;
+        for (let i = 0; i < offspring_count; i++) {
+            const code = `BB-${individual_id}-${Date.now()}-${i}`;
+            const gender = Math.random() > 0.5 ? 'Female' : 'Male';
+            await db.query(
+                'INSERT INTO livestock_individuals (batch_id, identification_code, birth_date, gender, provenance, status, mother_id, father_id, breed_id, pen_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                [animal.batch_id, code, event_date, gender, 'Naissance', 'Active', individual_id, partner_id, animal.breed_id, animal.pen_id]
+            );
+        }
+    } else if ((event_type === 'Insemination' || event_type === 'Mating') && animal.gender === 'Female') {
+        await db.query('UPDATE livestock_individuals SET status = \'Gestante\' WHERE id = $1', [individual_id]);
+
+        // Create an alert for upcoming birth
+        if (expected_birth_date) {
+            await db.query(
+                'INSERT INTO alerts (type, message, record_id, table_name) VALUES ($1, $2, $3, $4)',
+                ['Birth', `Mise bas prévue pour l'animal #${individual_id} le ${expected_birth_date}`, result.rows[0].id, 'reproduction_records']
+            );
+        }
+    }
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -245,6 +313,20 @@ router.get('/:id/performance', async (req, res) => {
             'SELECT AVG(sub.birth_count) as avg_prolificity FROM (SELECT individual_id, COUNT(*) as birth_count FROM reproduction_records WHERE event_type = \'Birth\' GROUP BY individual_id) sub'
         );
 
+        // Real GMQ calculation
+        const weightHistory = await db.query(
+            'SELECT weight, record_date FROM weight_records WHERE batch_id = $1 ORDER BY record_date ASC',
+            [batchId]
+        );
+        if (weightHistory.rows.length >= 2) {
+            const first = weightHistory.rows[0];
+            const last = weightHistory.rows[weightHistory.rows.length - 1];
+            const days = (new Date(last.record_date) - new Date(first.record_date)) / (1000 * 60 * 60 * 24);
+            if (days > 0) {
+                gmq = ((last.weight - first.weight) / days).toFixed(3) + ' kg/jour';
+            }
+        }
+
         if (feeding.rows[0].total_feed) feed_conversion = (feeding.rows[0].total_feed / 100).toFixed(2);
         if (batchInfo.rows[0] && batchInfo.rows[0].initial_count) {
             mortality_rate = ((mortalityCount.rows[0].count / batchInfo.rows[0].initial_count) * 100).toFixed(2) + '%';
@@ -274,15 +356,77 @@ router.get('/species', async (req, res) => {
       const result = await db.query('SELECT * FROM species ORDER BY name');
       res.json(result.rows);
     } catch (err) {
-      res.json([
-          {id: 1, name: 'Bovins'},
-          {id: 2, name: 'Ovins'},
-          {id: 3, name: 'Caprins'},
-          {id: 4, name: 'Volailles'},
-          {id: 5, name: 'Porcins'},
-          {id: 6, name: 'Poissons'}
-      ]);
+      res.status(500).json({ error: err.message });
     }
-  });
+});
+
+// POST species
+router.post('/species', async (req, res) => {
+    const { name, gestation_duration_days, adult_age_months, feed_type, care_frequency, fattening_duration_days, avg_weight_kg, expected_yield } = req.body;
+    try {
+        const result = await db.query(
+            'INSERT INTO species (name, gestation_duration_days, adult_age_months, feed_type, care_frequency, fattening_duration_days, avg_weight_kg, expected_yield) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+            [name, gestation_duration_days, adult_age_months, feed_type, care_frequency, fattening_duration_days, avg_weight_kg, expected_yield]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE breed
+router.delete('/breeds/:id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM breeds WHERE id = $1', [req.params.id]);
+        res.json({ message: 'Race supprimée' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET breeds
+router.get('/breeds', async (req, res) => {
+    try {
+        const result = await db.query('SELECT b.*, s.name as species_name FROM breeds b JOIN species s ON b.species_id = s.id ORDER BY s.name, b.name');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST breed
+router.post('/breeds', async (req, res) => {
+    const { species_id, name } = req.body;
+    try {
+        const result = await db.query(
+            'INSERT INTO breeds (species_id, name) VALUES ($1, $2) RETURNING *',
+            [species_id, name]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET buildings & pens
+router.get('/locations', async (req, res) => {
+    try {
+        const buildings = await db.query('SELECT * FROM buildings');
+        const pens = await db.query('SELECT * FROM pens');
+        res.json({ buildings: buildings.rows, pens: pens.rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET alerts
+router.get('/alerts', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM alerts WHERE status = \'Pending\' ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 module.exports = router;
