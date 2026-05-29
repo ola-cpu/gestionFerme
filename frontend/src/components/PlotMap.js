@@ -1,4 +1,5 @@
 import React from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 function PlotMap({ plots }) {
   return (
@@ -35,9 +36,16 @@ function PlotMap({ plots }) {
               background: p.status === 'Disponible' ? '#4CAF50' : '#FF9800',
               borderRadius: '50%',
               border: '2px solid white',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
-          />
+          >
+              <div className="plot-qr-hover" style={{display: 'none', position: 'absolute', top: '25px', background: 'white', padding: '5px', borderRadius: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'}}>
+                  <QRCodeSVG value={p.qr_code || p.name} size={64} />
+              </div>
+          </div>
         ))}
       </div>
       <div style={{ marginTop: '10px', fontSize: '0.9em' }}>

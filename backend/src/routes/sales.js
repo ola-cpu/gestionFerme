@@ -40,6 +40,23 @@ async function processSaleItems(client, saleId, items, document_type, reference_
         const isConfirmed = ['Facture', 'Bon de commande'].includes(document_type);
 
         if (item.stock_item_id && isConfirmed) {
+            // Verify compliance before sale
+            if (item.batch_id) {
+                const batchRes = await db.query('SELECT is_compliant FROM stock_batches WHERE id = $1', [item.batch_id]);
+                if (batchRes.rows.length > 0 && !batchRes.rows[0].is_compliant) {
+                    throw new Error(`Le lot #${item.batch_id} n'est pas conforme et ne peut être vendu.`);
+                }
+            } else {
+                // Check if any non-compliant batch would be used by FIFO
+                const batchesRes = await db.query(
+                    'SELECT id FROM stock_batches WHERE stock_item_id = $1 AND current_quantity > 0 AND is_compliant = FALSE ORDER BY received_date ASC',
+                    [item.stock_item_id]
+                );
+                if (batchesRes.rows.length > 0) {
+                    throw new Error(`Certains lots pour le produit ID ${item.stock_item_id} ne sont pas conformes.`);
+                }
+            }
+
             // Assuming warehouse_id is handled (default to 1 for this implementation)
             await deductStockFIFO(item.stock_item_id, 1, item.quantity, `Vente #${reference_number}`, user_id);
         }

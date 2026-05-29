@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { authorize } = require('../middleware/auth');
 const { deductStockFIFO } = require('../utils/stockUtils');
+const { logAction } = require('../utils/auditLogger');
 
 // Apply authorization to all livestock routes
 router.use(authorize(['Chef d’élevage', 'Vétérinaire/technicien']));
@@ -95,11 +96,28 @@ router.delete('/species/:id', async (req, res) => {
 // POST an individual
 router.post('/individuals', async (req, res) => {
   const { batch_id, identification_code, birth_date, gender, breed_id, pen_id, name, provenance, status } = req.body;
+  const user_id = req.user.id;
   try {
+    const code = identification_code || `IND-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const qr_code = `QR-${code}`;
+
     const result = await db.query(
-      'INSERT INTO livestock_individuals (batch_id, identification_code, birth_date, gender, breed_id, pen_id, name, provenance, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [batch_id, identification_code, birth_date, gender, breed_id, pen_id, name, provenance, status]
+      'INSERT INTO livestock_individuals (batch_id, identification_code, qr_code, birth_date, gender, breed_id, pen_id, name, provenance, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [batch_id, code, qr_code, birth_date, gender, breed_id, pen_id, name, provenance, status]
     );
+
+    await logAction(
+        user_id,
+        'CREATE_INDIVIDUAL',
+        'livestock_individuals',
+        result.rows[0].id,
+        { identification_code: code },
+        null,
+        JSON.stringify(result.rows[0]),
+        req.user.ip_address,
+        req.user.user_agent
+    );
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -266,10 +284,11 @@ router.post('/reproduction', async (req, res) => {
         const { offspring_count = 1 } = req.body;
         for (let i = 0; i < offspring_count; i++) {
             const code = `BB-${individual_id}-${Date.now()}-${i}`;
+            const qr_code = `QR-${code}`;
             const gender = Math.random() > 0.5 ? 'Female' : 'Male';
             await db.query(
-                'INSERT INTO livestock_individuals (batch_id, identification_code, birth_date, gender, provenance, status, mother_id, father_id, breed_id, pen_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                [animal.batch_id, code, event_date, gender, 'Naissance', 'Active', individual_id, partner_id, animal.breed_id, animal.pen_id]
+                'INSERT INTO livestock_individuals (batch_id, identification_code, qr_code, birth_date, gender, provenance, status, mother_id, father_id, breed_id, pen_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+                [animal.batch_id, code, qr_code, event_date, gender, 'Naissance', 'Active', individual_id, partner_id, animal.breed_id, animal.pen_id]
             );
         }
     } else if ((event_type === 'Insemination' || event_type === 'Mating') && animal.gender === 'Female') {

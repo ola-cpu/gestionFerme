@@ -18,6 +18,8 @@ async function authenticate(req, res, next) {
 
     if (result.rows.length > 0) {
       req.user = result.rows[0];
+      req.user.ip_address = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      req.user.user_agent = req.headers['user-agent'];
       return next();
     }
   } catch (err) {
@@ -27,6 +29,8 @@ async function authenticate(req, res, next) {
   // Mock fallback for demo purposes (e.g., if DB is down or user not in DB)
   if (userId === '999') {
     req.user = { id: 999, username: 'demo', role_name: 'Admin' };
+    req.user.ip_address = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    req.user.user_agent = req.headers['user-agent'];
     return next();
   }
 

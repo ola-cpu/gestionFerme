@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { deductStockFIFO } = require('../utils/stockUtils');
+const { logAction } = require('../utils/auditLogger');
 
 // --- PLOTS ---
 
@@ -146,14 +147,65 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-  const { crop_name, season, actual_yield, harvest_date, campaign_id, crop_type_id } = req.body;
+  const { crop_name, season, actual_yield, harvest_date, campaign_id, crop_type_id, warehouse_id } = req.body;
+  const user_id = req.user.id;
   try {
+    await db.query('BEGIN');
+
+    // Get current state for audit and to check if harvest is new
+    const currentCycleRes = await db.query('SELECT * FROM crop_cycles WHERE id = $1', [req.params.id]);
+    const currentCycle = currentCycleRes.rows[0];
+
     const result = await db.query(
       'UPDATE crop_cycles SET crop_name = $1, season = $2, actual_yield = $3, harvest_date = $4, campaign_id = $5, crop_type_id = $6 WHERE id = $7 RETURNING *',
       [crop_name, season, actual_yield, harvest_date, campaign_id, crop_type_id, req.params.id]
     );
-    res.json(result.rows[0]);
+    const updatedCycle = result.rows[0];
+
+    // If actual_yield was updated and wasn't set before, create a stock batch
+    if (actual_yield && !currentCycle.actual_yield) {
+        // 1. Find or create stock_item for this crop
+        let stockItemRes = await db.query('SELECT id FROM stock_items WHERE name = $1', [crop_name]);
+        let stockItemId;
+        if (stockItemRes.rows.length === 0) {
+            const newStockItem = await db.query(
+                'INSERT INTO stock_items (name, unit, is_product, current_stock) VALUES ($1, $2, $3, $4) RETURNING id',
+                [crop_name, 'kg', true, actual_yield]
+            );
+            stockItemId = newStockItem.rows[0].id;
+        } else {
+            stockItemId = stockItemRes.rows[0].id;
+            await db.query('UPDATE stock_items SET current_stock = current_stock + $1 WHERE id = $2', [actual_yield, stockItemId]);
+        }
+
+        // 2. Create stock batch
+        const batchNumber = `HARVEST-${updatedCycle.id}-${Date.now()}`;
+        const stockBatchRes = await db.query(
+            'INSERT INTO stock_batches (stock_item_id, warehouse_id, batch_number, initial_quantity, current_quantity, received_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+            [stockItemId, warehouse_id || 1, batchNumber, actual_yield, actual_yield, harvest_date || new Date()]
+        );
+
+        // 3. Link cycle to stock batch
+        await db.query('UPDATE crop_cycles SET harvest_batch_id = $1 WHERE id = $2', [stockBatchRes.rows[0].id, updatedCycle.id]);
+        updatedCycle.harvest_batch_id = stockBatchRes.rows[0].id;
+    }
+
+    await logAction(
+        user_id,
+        actual_yield && !currentCycle.actual_yield ? 'HARVEST_CROP' : 'UPDATE_CROP_CYCLE',
+        'crop_cycles',
+        updatedCycle.id,
+        { crop_name, actual_yield },
+        JSON.stringify(currentCycle),
+        JSON.stringify(updatedCycle),
+        req.user.ip_address,
+        req.user.user_agent
+    );
+
+    await db.query('COMMIT');
+    res.json(updatedCycle);
   } catch (err) {
+    await db.query('ROLLBACK');
     res.status(500).json({ error: err.message });
   }
 });
